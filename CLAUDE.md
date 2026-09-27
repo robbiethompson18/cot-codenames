@@ -13,8 +13,8 @@ instructions. Do not replace it with a separate file.
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
   `uv run ruff check . && uv run ruff format . && uv run ty check` before shipping.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
-- Tests: none until this repo is roughly > 50k LOC. Verify by running the code, not by adding a
-  test suite. If a test would genuinely save time, ask first.
+- Tests: none until this repo is roughly > 50k LOC. Verify by running the code, not by adding a test
+  suite. If a test would genuinely save time, ask first.
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
 
 ## Docs
@@ -32,5 +32,6 @@ Current docs:
 
 - [Plan — staged build plan; read before starting any stage](plan.md) — stages 0–5, each with a
   writeup, graphs, and example games to check
+
 <!-- As docs are added under docs/, list them here, one per line: -->
 <!-- - [Title — when to read](docs/foo.md) — short gloss -->
