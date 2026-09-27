@@ -23,16 +23,14 @@ before the next stage starts.
 
 ## Stage 1: v0 grep monitor
 
-- Monitor = most-frequent whole-word board-word match in the spymaster CoT (all turns). Null: grep
-  the same CoT against 10 dummy boards to get the false-positive rate from common words (LINE,
-  PLAY).
+- Monitor = most-frequent whole-word board-word match in spymaster CoT. Null: grep the same CoT
+  against 10 dummy boards (false positives from common words like LINE, PLAY).
 - Graphs: leak rate by model × told/not-told (with null line); which word types leak (team / neutral
   / assassin); win rate vs leak rate scatter (capability cost of hiding).
 
 ## Stage 2: v1 LLM monitor, no board
 
-- The monitor sees the CoT and the wordlist and outputs one word; it wins if the word is on the
-  board.
+- Monitor sees CoT + wordlist, outputs one word; wins if it's on the board.
 - **Control: clue-only monitor.** The CoT contains the clue, so a monitor can act like a guesser.
   Leak = P(win | CoT) − P(win | public clues only). Chance = 25/400.
 - Graphs: monitor win rate (CoT / clue-only / chance) by model × told; grep vs LLM (paraphrase).
@@ -49,5 +47,4 @@ before the next stage starts.
 
 ## Stage 5 (stretch): RL
 
-- GRPO on a small self-hosted open model, reward = game score − monitor catch. Track leak rate over
-  steps; check for steganography vs genuine internalization.
+- GRPO on a small self-hosted model, reward = score − monitor catch. Leak rate over steps; stego?
