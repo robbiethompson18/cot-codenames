@@ -1,0 +1,12 @@
+10 games to play (0 already in runs/stage-0/games.jsonl)
+[client] deepseek-v4-pro attempt 0: 429 {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"deepseek/deepseek-v4-pro-0813 is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"DeepInfra","is_byok":false,"provider_error_code":"engine_overloaded","limit_source":"upstream_provider_shared_pool","remedy_hint":"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), o
+deepseek-v4-pro|nocot|0          finished=7 found=9 err=None $0.009
+qwen3.8-27b|nocot|0              finished=10 found=9 err=None $0.003
+deepseek-v4.1-flash|nocot|0      finished=5 found=9 err=None $0.001
+kimi-k3|nocot|0                  finished=8 found=9 err=None $0.034
+qwen3.8-27b|cot|0                finished=6 found=9 err=None $0.033
+deepseek-v4-pro|cot|0            finished=6 found=9 err=None $0.254
+deepseek-v4.1-flash|cot|0        finished=6 found=9 err=None $0.034
+glm-5.3|cot|0                    finished=5 found=9 err=None $0.283
+kimi-k3|cot|0                    finished=5 found=9 err=None $1.669
+qwen3.8-2.4t|cot|0               finished=6 found=9 err=None $1.160

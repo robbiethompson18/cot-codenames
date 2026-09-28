@@ -1,0 +1,21 @@
+20 games to play (0 already in runs/stage-0/games-deepseek-together.jsonl)
+deepseek-v4-pro|nocot|7          finished=5 found=9 err=None $0.004
+deepseek-v4-pro|nocot|9          finished=7 found=9 err=None $0.006
+deepseek-v4-pro|nocot|1          finished=7 found=9 err=None $0.006
+deepseek-v4-pro|nocot|2          finished=7 found=9 err=None $0.008
+deepseek-v4-pro|nocot|5          finished=7 found=9 err=None $0.006
+deepseek-v4-pro|nocot|4          finished=8 found=9 err=None $0.007
+deepseek-v4-pro|nocot|0          finished=8 found=9 err=None $0.007
+deepseek-v4-pro|nocot|6          finished=8 found=9 err=None $0.008
+deepseek-v4-pro|nocot|8          finished=9 found=9 err=None $0.008
+deepseek-v4-pro|nocot|3          finished=9 found=9 err=None $0.009
+deepseek-v4-pro|cot|9            finished=5 found=9 err=None $0.051
+deepseek-v4-pro|cot|7            finished=4 found=9 err=None $0.065
+deepseek-v4-pro|cot|4            finished=7 found=9 err=None $0.090
+deepseek-v4-pro|cot|1            finished=5 found=9 err=None $0.089
+deepseek-v4-pro|cot|5            finished=6 found=9 err=None $0.090
+deepseek-v4-pro|cot|8            finished=5 found=9 err=None $0.095
+deepseek-v4-pro|cot|6            finished=6 found=9 err=None $0.104
+deepseek-v4-pro|cot|0            finished=5 found=9 err=None $0.143
+deepseek-v4-pro|cot|3            finished=5 found=9 err=None $0.418
+deepseek-v4-pro|cot|2            finished=7 found=9 err=None $0.545
