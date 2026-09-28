@@ -34,6 +34,8 @@ Current docs:
   writeup, graphs, and example games to check
 - [Stage 0 writeup — read before stage 1 or before changing models/providers](docs/stage-0.md) —
   harness checks (CoT carryover, no-CoT), provider gotchas, turns-to-finish CoT vs no-CoT
+- [Stage 1 writeup — read before stage 2 or before changing the told prompt / no-CoT setup](docs/stage-1.md)
+  — grep monitor, told vs not told (0/30 comply), tool_choice ablation
 - [Run format — read before analyzing or changing games.jsonl records](docs/run-format.md) — game
   and call fields, error kinds and replay policy, `n_in` prompt reconstruction
 - [Lit check: CoT control, stego, secret-hiding games — read before designing a monitor or condition](docs/lit-cot-control.md)

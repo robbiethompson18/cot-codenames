@@ -69,7 +69,8 @@ def strip(ax, models: list[str], values: dict[tuple[str, str], list[float]], yla
     ax.set_title(title, loc="left", fontsize=11, color=INK)
     if len(conds) > 1:  # a single series is named by the title, no legend
         handles = [plt.Line2D([], [], marker="o", ls="", color=COLORS[c], label=LABELS[c]) for c in conds]
-        ax.legend(handles=handles, frameon=False, loc="upper left", fontsize=9)
+        # Outside the axes: the data fills both the top (100% leak) and the bottom (0%) of these plots.
+        ax.legend(handles=handles, frameon=False, loc="upper left", bbox_to_anchor=(1.0, 1.0), fontsize=9)
 
 
 def grouped(games: list[dict], f) -> dict[tuple[str, str], list[float]]:
