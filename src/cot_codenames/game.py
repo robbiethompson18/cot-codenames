@@ -26,7 +26,13 @@ CLUE_RE = re.compile(r"[a-z]+")
 
 
 def cond_name(condition: dict) -> str:
-    return "cot" if condition["thinking"] else "nocot"
+    return ("cot" if condition["thinking"] else "nocot") + ("-told" if condition.get("told") else "")
+
+
+def system_prompt(role: str, condition: dict) -> str:
+    base, tool = (P.SPYMASTER_SYSTEM, "submit_clue") if role == "spymaster" else (P.GUESSER_SYSTEM, "submit_guesses")
+    told = P.TOLD_SUFFIX if role == "spymaster" and condition.get("told") else ""
+    return base + told + (P.cot_suffix(tool) if condition["thinking"] else P.NO_COT_SUFFIX)
 
 
 def check_clue(args: dict, board: list[str]) -> str | None:
@@ -45,7 +51,7 @@ def check_clue(args: dict, board: list[str]) -> str | None:
 class Agent:
     def __init__(self, role: str, model: str, thinking: bool, system: str, tool: dict, nudge: str, calls: list[dict]):
         self.role, self.model, self.thinking, self.tool, self.nudge, self.calls = role, model, thinking, tool, nudge, calls
-        self.messages: list[dict] = [{"role": "system", "content": system if thinking else system + P.NO_COT_SUFFIX}]
+        self.messages: list[dict] = [{"role": "system", "content": system}]
         self.pending_call_ids: list[str] = []
 
     def act(self, text: str, turn: int, check: Callable[[dict], str | None] = lambda _: None) -> dict | None:
@@ -115,8 +121,8 @@ def play(model: str, condition: dict, seed: int) -> dict:
     team, neutral = board[: P.N_TEAM], board[P.N_TEAM :]
     board_order = rng.sample(board, len(board))  # guesser's view, so team words aren't listed first
     calls: list[dict] = []
-    spy = Agent("spymaster", model, thinking, P.SPYMASTER_SYSTEM, P.SUBMIT_CLUE, P.NUDGE_CLUE, calls)
-    gus = Agent("guesser", model, thinking, P.GUESSER_SYSTEM, P.SUBMIT_GUESSES, P.NUDGE_GUESS, calls)
+    spy = Agent("spymaster", model, thinking, system_prompt("spymaster", condition), P.SUBMIT_CLUE, P.NUDGE_CLUE, calls)
+    gus = Agent("guesser", model, thinking, system_prompt("guesser", condition), P.SUBMIT_GUESSES, P.NUDGE_GUESS, calls)
     slug, provider = MODELS[model]
     game = {
         "id": f"{model}|{cond_name(condition)}|{seed}",

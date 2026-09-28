@@ -19,7 +19,13 @@ packages = ["src/cot_codenames"]
 line-length = 140
 
 [tool.ruff.lint]
-extend-select = ["I"]   # isort — ruff owns import ordering too
+extend-select = [
+  "I",     # isort — ruff owns import ordering too
+  "E501",  # line too long — not in ruff's defaults, and `ruff format` never wraps strings/comments
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/cot_codenames/dashboard.py" = ["E501"]  # embedded HTML/JS template, not worth wrapping
 
 [dependency-groups]
 dev = [

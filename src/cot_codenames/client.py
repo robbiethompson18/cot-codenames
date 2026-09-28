@@ -7,7 +7,8 @@ import httpx
 
 # short name -> (OpenRouter slug, pinned provider), no fallbacks. All open weights (hugging_face_id on OpenRouter).
 # First-party where possible. DeepSeek's own endpoint is blocked by our account's no-training privacy setting, so
-# Together (DeepInfra caps its output at 16k tokens, which truncated reasoning). Qwen3.8-27B on Alibaba drops prior-turn reasoning, so DeepInfra. See docs/stage-0.md.
+# Together (DeepInfra caps its output at 16k tokens, which truncated reasoning). Qwen3.8-27B on Alibaba drops
+# prior-turn reasoning, so DeepInfra. See docs/stage-0.md.
 MODELS = {
     "kimi-k3": ("moonshotai/kimi-k3", "moonshotai"),
     "glm-5.3": ("z-ai/glm-5.3", "z-ai"),
@@ -18,6 +19,8 @@ MODELS = {
 }
 # OpenRouter rejects reasoning={"enabled": False} for these on every provider we tried ("Reasoning is mandatory").
 THINKING_MANDATORY = {"glm-5.3", "qwen3.8-2.4t"}
+# What we run and show from stage 1 on: the models with a no-CoT arm (so not THINKING_MANDATORY), minus the dev model.
+DEFAULT_MODELS = ["kimi-k3", "deepseek-v4-pro", "deepseek-v4.1-flash"]
 
 URL = "https://openrouter.ai/api/v1/chat/completions"
 # httpx defaults to 100 pooled connections, which would silently queue (and time out) calls above that.
