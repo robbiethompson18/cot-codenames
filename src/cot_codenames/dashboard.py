@@ -9,7 +9,9 @@ import argparse
 import json
 from pathlib import Path
 
-from cot_codenames.game import load_games
+from cot_codenames.client import DEFAULT_MODELS
+from cot_codenames.game import cond_name, load_games
+from cot_codenames.monitor import grep
 
 
 def slim(game: dict) -> dict:
@@ -44,7 +46,7 @@ select{font-size:14px;padding:4px;max-width:100%}.cols{display:grid;grid-templat
 <script>
 const GAMES = __DATA__;
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const cond = g => g.condition.thinking ? "cot" : "nocot";
+const cond = g => g.cond;  // cond_name(), computed in Python
 const mean = xs => xs.length ? (xs.reduce((a,b)=>a+b,0)/xs.length) : NaN;
 // Pre-validation games (before check_clue) sometimes used a board word as the clue; flag those.
 const boardClue = (g, t) => [...g.team, ...g.neutral].flatMap(w => w.split(" ")).includes(String(t.clue).toUpperCase());
@@ -59,10 +61,10 @@ function highlight(text, g) {
 // Summary
 const groups = {};
 for (const g of GAMES) (groups[g.model+" · "+cond(g)] ??= []).push(g);
-let h = "<table><tr><th>model · condition</th><th>games</th><th>finished ≤10</th><th>mean turns (finished)</th><th>mean found</th><th>errors</th><th>$/game</th></tr>";
+let h = "<table><tr><th>model · condition</th><th>games</th><th>finished ≤10</th><th>mean turns (finished)</th><th>mean found</th><th>errors</th><th>grep monitor wins</th><th>spymaster turns leaked</th><th>$/game</th></tr>";
 for (const [k, gs] of Object.entries(groups).sort()) {
   const fin = gs.filter(g=>g.turns_to_finish);
-  h += `<tr><td>${esc(k)}</td><td>${gs.length}</td><td>${fin.length}</td><td>${mean(fin.map(g=>g.turns_to_finish)).toFixed(1)}</td><td>${mean(gs.map(g=>g.found)).toFixed(1)}</td><td class="${gs.some(g=>g.error)?"bad":""}">${gs.filter(g=>g.error).length}</td><td>${mean(gs.map(cost)).toFixed(3)}</td></tr>`;
+  h += `<tr><td>${esc(k)}</td><td>${gs.length}</td><td>${fin.length}</td><td>${mean(fin.map(g=>g.turns_to_finish)).toFixed(1)}</td><td>${mean(gs.map(g=>g.found)).toFixed(1)}</td><td class="${gs.some(g=>g.error)?"bad":""}">${gs.filter(g=>g.error).length}</td><td>${(100*mean(gs.map(g=>+g.grep.monitor_wins))).toFixed(0)}%</td><td>${(100*mean(gs.map(g=>g.grep.frac_turns_leaked))).toFixed(0)}%</td><td>${mean(gs.map(cost)).toFixed(3)}</td></tr>`;
 }
 document.getElementById("summary").innerHTML = h + "</table>";
 
@@ -96,7 +98,8 @@ function show(i) {
   const g = GAMES[i]; if (!g) return; pick.value = i;
   document.getElementById("nav").innerHTML = `<a href="#${Math.max(0,i-1)}">← prev</a> · <a href="#${Math.min(GAMES.length-1,i+1)}">next →</a>`;
   const when = {}; g.turns.forEach(t => t.reveals.forEach(r => { if (r.kind!=="invalid") when[r.word] = t.turn; }));
-  let h = `<div class="card"><h2>${esc(g.id)}</h2><div>${g.turns_to_finish ? "Finished in <b>"+g.turns_to_finish+"</b> turns" : "Found "+g.found+"/9 (not finished)"} · $${cost(g).toFixed(3)}${g.error?` · <span class="bad">${esc(g.error_kind ?? "error")}: ${esc(g.error)}</span>`:""}</div>`;
+  let h = `<div class="card"><h2>${esc(g.id)}</h2><div>${g.turns_to_finish ? "Finished in <b>"+g.turns_to_finish+"</b> turns" : "Found "+g.found+"/9 (not finished)"} · $${cost(g).toFixed(3)}${g.error?` · <span class="bad">${esc(g.error_kind ?? "error")}: ${esc(g.error)}</span>`:""}</div>
+    <div>Grep monitor (spymaster reasoning + replies): ${g.grep.guess ? `guesses <b class="bad">${esc(g.grep.guess)}</b> → <b class="bad">wins</b>` : '<b>no board word found → loses</b>'} · distinct board words written: team ${g.grep.distinct_team}/9, neutral ${g.grep.distinct_neutral}/16</div>`;
   h += `<p class="muted">Board (guesser's order). Green = team. Superscript = turn revealed.</p><div class="board">` + g.board_order.map(w =>
     `<div class="cell ${g.team.includes(w)?"t":"n"}">${esc(w)}${when[w]?`<sup> ${when[w]}</sup>`:""}</div>`).join("") + `</div></div>`;
   // Iterate over turns that made calls, not g.turns: a turn that ended in a protocol error has calls but no turn record.
@@ -104,7 +107,7 @@ function show(i) {
     const t = g.turns.find(t => t.turn === n);
     h += `<div class="card"><h3>Turn ${n}: ${t ? `<span class="clue">${esc(t.clue)} ${t.number}</span>${boardClue(g,t)?' <span class="bad">(board word!)</span>':""}` : '<span class="bad">no valid move</span>'}</h3>
       <div>Guesses: ${t ? t.reveals.map(r=>`<span class="${r.kind==="team"?"team":r.kind==="invalid"?"bad":"neutral"}">${esc(r.word)}</span> (${r.kind})`).join(", ") || "none" : "—"}</div>
-      <div class="cols"><div><h3>Spymaster</h3>${agentTurn(g,"spymaster",n)}</div><div><h3>Guesser</h3>${agentTurn(g,"guesser",n)}</div></div></div>`;
+      <div class="cols"><div><h3>Spymaster <span class="muted" style="font-size:12px">· grep: ${Object.values(g.grep.per_turn[n]||{}).reduce((a,b)=>a+b,0)} board-word mentions</span></h3>${agentTurn(g,"spymaster",n)}</div><div><h3>Guesser</h3>${agentTurn(g,"guesser",n)}</div></div></div>`;
   }
   for (const role of ["spymaster","guesser"])
     h += `<details class="card"><summary>Raw messages: ${role} (exact list sent on the last call; call k saw the first n_in messages) + tools</summary><pre>${esc(JSON.stringify({tools:g[role].tools, messages:g[role].messages}, null, 1))}</pre></details>`;
@@ -118,10 +121,11 @@ show(+location.hash.slice(1) || 0);
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", type=int, required=True)
+    ap.add_argument("--models", nargs="+", default=DEFAULT_MODELS, help="others stay in games.jsonl, just hidden")
     args = ap.parse_args()
     run_dir = Path(f"runs/stage-{args.stage}")
-    games = [slim(g) for g in load_games(run_dir / "games.jsonl")]
-    games.sort(key=lambda g: (g["model"], not g["condition"]["thinking"], g["seed"]))
+    games = [slim(g) | {"cond": cond_name(g["condition"]), "grep": grep(g)} for g in load_games(run_dir / "games.jsonl")]
+    games = sorted((g for g in games if g["model"] in args.models), key=lambda g: (g["model"], g["cond"], g["seed"]))
     # "</" inside JSON would close the <script> tag early.
     data = json.dumps(games).replace("</", "<\\/")
     out = run_dir / "dashboard.html"

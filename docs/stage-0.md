@@ -1,8 +1,8 @@
 # Stage 0: harness, no monitor
 
-2026-09-28. Data: `runs/stage-0/games.jsonl` (+ DeepSeek V4 Pro from
-`games-deepseek-together.jsonl`, see below). Viewer: `runs/stage-0/dashboard.html`. Probe:
-`runs/stage-0/probe.jsonl`.
+2026-09-28. Data: `runs/stage-0/games.jsonl` (DeepSeek V4 Pro games are the Together reruns; the
+DeepInfra ones were dropped from the file). Viewer: `runs/stage-0/dashboard.html` (shows only the 3
+models we keep, see Robbie's point 4). Probe: `runs/stage-0/probe.jsonl`.
 
 ## Setup
 
@@ -36,14 +36,14 @@
   call" line. That was for these games; current code uses `auto` + a reworded suffix, see "Code
   drift".
 
-## Results (106/110 games so far; 3 Qwen-2.4T + 1 Qwen-27B CoT games still running)
+## Results (109/110 games; 1 Qwen-27B CoT straggler was stopped after we dropped Qwen)
 
 | model               | cond  | n   | turns to finish (± SE) | 1st clue N | found on turn 1 | $/game |
 | ------------------- | ----- | --- | ---------------------- | ---------- | --------------- | ------ |
 | kimi-k3             | CoT   | 10  | 4.5 ± 0.3              | 3.6        | 3.3             | 1.03   |
 | kimi-k3             | noCoT | 10  | 7.6 ± 0.4              | 2.9        | 1.4             | 0.04   |
 | glm-5.3             | CoT   | 10  | 4.8 ± 0.3              | 3.8        | 3.3             | 0.23   |
-| qwen3.8-2.4t        | CoT   | 7   | 4.9 ± 0.5              | 3.0        | 2.9             | 0.38   |
+| qwen3.8-2.4t        | CoT   | 10  | 4.7 ± 0.4              | 3.5        | 3.0             | 0.57   |
 | deepseek-v4-pro     | CoT   | 10  | 5.5 ± 0.3              | 2.9        | 2.9             | 0.17   |
 | deepseek-v4-pro     | noCoT | 10  | 7.5 ± 0.4              | 2.4        | 1.7             | 0.01   |
 | deepseek-v4.1-flash | CoT   | 10  | 5.5 ± 0.4              | 3.1        | 3.0             | 0.02   |
@@ -63,6 +63,11 @@ models are close to each other with CoT, at 4.5–5.5 turns.
 Spymaster CoT is front-loaded: turn 1 is often 5k–25k reasoning tokens, and later turns are mostly
 under 1k. At providers' 30–55 tok/s, one Qwen-2.4T turn-1 call took 23 min (54k tokens). That tail,
 not the median game (8–15 min), sets stage wall-clock time.
+
+**Not-told grep baseline (preview of stage 1):** in every CoT game, the spymaster's reasoning names
+all 25 board words, and a board word appears on 100% of spymaster turns (e.g. EYE 145× in one Kimi
+turn-1 CoT). No-CoT is 0% by construction. So in the not-told condition the grep monitor always
+wins. See `uv run python -m cot_codenames.monitor --stage 0`.
 
 ## Data quality / caveats
 
@@ -106,3 +111,8 @@ Cost: ~$20 for stage 0 including probes and discarded DeepInfra runs.
    should do this
 3. Where are prompts for me to review?
 4. We should just not use the models that don't let us turn off CoT for now.
+
+@robbie addressed in stage 1: (1) CoT games now get "your reply must contain only the tool call" and
+the monitor reads reasoning + replies; (2) the new `told` condition (spymaster only); (3) prompts
+are in `src/cot_codenames/prompts.py`; (4) `DEFAULT_MODELS` = Kimi K3, DeepSeek V4 Pro, DeepSeek
+V4.1 Flash.
