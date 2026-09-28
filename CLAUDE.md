@@ -32,6 +32,17 @@ Current docs:
 
 - [Plan — staged build plan; read before starting any stage](plan.md) — stages 0–5, each with a
   writeup, graphs, and example games to check
+- [Stage 0 writeup — read before stage 1 or before changing models/providers](docs/stage-0.md) —
+  harness checks (CoT carryover, no-CoT), provider gotchas, turns-to-finish CoT vs no-CoT
+- [Run format — read before analyzing or changing games.jsonl records](docs/run-format.md) — game
+  and call fields, error kinds and replay policy, `n_in` prompt reconstruction
+- [Lit check: CoT control, stego, secret-hiding games — read before designing a monitor or condition](docs/lit-cot-control.md)
+  — 18 papers, closest prior work, novelty, design implications
 
 <!-- As docs are added under docs/, list them here, one per line: -->
 <!-- - [Title — when to read](docs/foo.md) — short gloss -->
+
+## Operator Notes
+
+** Maximum parallelism always:** Just kick off requests to OpenRoute in parallel, up to 500. If we
+get rate limited lmk.
