@@ -27,13 +27,14 @@ CLUE_RE = re.compile(r"[a-z]+")
 
 def cond_name(condition: dict) -> str:
     name = ("cot" if condition["thinking"] else "nocot") + ("-told" if condition.get("told") else "")
-    return name + ("-fs" if condition.get("fewshot") else "")
+    return name + ("-fs" if condition.get("fewshot") else "") + ("-idx" if condition.get("indexed") else "")
 
 
 def system_prompt(role: str, condition: dict) -> str:
     base, tool = (P.SPYMASTER_SYSTEM, "submit_clue") if role == "spymaster" else (P.GUESSER_SYSTEM, "submit_guesses")
     spy = role == "spymaster"
-    told = (P.TOLD_SUFFIX if condition.get("told") else "") + (P.FEWSHOT_SUFFIX if condition.get("fewshot") else "")
+    told = (P.TOLD_SUFFIX if condition.get("told") else "") + (P.INDEXED_SUFFIX if condition.get("indexed") else "")
+    told += P.FEWSHOT_SUFFIX if condition.get("fewshot") else ""
     return base + (told if spy else "") + (P.cot_suffix(tool) if condition["thinking"] else P.NO_COT_SUFFIX)
 
 
@@ -143,7 +144,12 @@ def play(model: str, condition: dict, seed: int) -> dict:
         "error_kind": None,
     }
     revealed: set[str] = set()
-    spy_text = P.spymaster_start(team, neutral)
+    # Indexed condition: the spymaster sees each board word next to a fixed label (T1-T9, N1-N16) in every message, so
+    # it can reason by label without ever writing out which label is which word.
+    labels = {w: f"T{i}" for i, w in enumerate(team, 1)} | {w: f"N{i}" for i, w in enumerate(neutral, 1)}
+    show = (lambda w: f"{labels[w]} {w}") if condition.get("indexed") else (lambda w: w)
+    board_rx = re.compile(r"\b(" + "|".join(map(re.escape, sorted(board, key=len, reverse=True))) + r")\b")
+    spy_text = P.spymaster_start([show(w) for w in team], [show(w) for w in neutral])
     results = ""
     try:
         for turn in range(1, P.MAX_TURNS + 1):
@@ -171,7 +177,10 @@ def play(model: str, condition: dict, seed: int) -> dict:
                 game["turns_to_finish"] = turn
                 break
             spy_text = P.spymaster_update(
-                results, [w for w in team if w not in revealed], [w for w in neutral if w not in revealed], turn + 1
+                board_rx.sub(lambda m: show(m.group(0)), results),
+                [show(w) for w in team if w not in revealed],
+                [show(w) for w in neutral if w not in revealed],
+                turn + 1,
             )
     except RuntimeError as e:  # client.chat gave up
         game["error"], game["error_kind"] = str(e)[-300:], "infra"

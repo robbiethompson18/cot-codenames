@@ -20,8 +20,22 @@ from cot_codenames.prompts import MAX_TURNS
 # Reference palette (dataviz skill): categorical slots 1-4 in fixed order (validated for adjacent pairs), recessive ink
 # for axes/text. A condition keeps its color across stages.
 # Dict order = column order in each model group. This ordering passes validate_palette.js (light) for adjacent pairs.
-COLORS = {"cot": "#2a78d6", "cot-told": "#eb6834", "cot-told-fs": "#4a3aa7", "nocot": "#1baf7a", "nocot-told": "#eda100"}
-LABELS = {"cot": "CoT", "cot-told": "CoT, told", "cot-told-fs": "CoT, told + examples", "nocot": "no CoT", "nocot-told": "no CoT, told"}
+COLORS = {
+    "cot": "#2a78d6",
+    "cot-told": "#eb6834",
+    "cot-told-fs": "#4a3aa7",
+    "cot-told-fs-idx": "#e87ba4",
+    "nocot": "#1baf7a",
+    "nocot-told": "#eda100",
+}
+LABELS = {
+    "cot": "CoT",
+    "cot-told": "CoT, told",
+    "cot-told-fs": "CoT, told + examples",
+    "cot-told-fs-idx": "CoT, told + examples + labels",
+    "nocot": "no CoT",
+    "nocot-told": "no CoT, told",
+}
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e7e5e4"
 FIGS = Path("docs/figs")
 
