@@ -1,0 +1,38 @@
+30 games to play (120 already in runs/stage-1/games.jsonl)
+[client] deepseek-v4-pro attempt 0: 429 {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"deepseek/deepseek-v4-pro-0813 is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Together","is_byok":false,"limit_source":"upstream_provider_shared_pool","remedy_hint":"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider r
+[client] deepseek-v4-pro attempt 0: 429 {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"deepseek/deepseek-v4-pro-0813 is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Together","is_byok":false,"limit_source":"upstream_provider_shared_pool","remedy_hint":"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider r
+[client] deepseek-v4-pro attempt 0: 429 {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"deepseek/deepseek-v4-pro-0813 is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Together","is_byok":false,"limit_source":"upstream_provider_shared_pool","remedy_hint":"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider r
+[client] deepseek-v4-pro attempt 0: 429 {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"deepseek/deepseek-v4-pro-0813 is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Together","is_byok":false,"limit_source":"upstream_provider_shared_pool","remedy_hint":"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider r
+[client] deepseek-v4-pro attempt 0: 429 {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"deepseek/deepseek-v4-pro-0813 is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Together","is_byok":false,"limit_source":"upstream_provider_shared_pool","remedy_hint":"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider r
+[client] deepseek-v4-pro attempt 0: 429 {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"deepseek/deepseek-v4-pro-0813 is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Together","is_byok":false,"limit_source":"upstream_provider_shared_pool","remedy_hint":"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider r
+deepseek-v4-pro|cot-told-fs|2    finished=5 found=9 err=None $0.034
+deepseek-v4-pro|cot-told-fs|9    finished=5 found=9 err=None $0.053
+[client] deepseek-v4-pro attempt 0: 429 {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"deepseek/deepseek-v4-pro-0813 is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Together","is_byok":false,"limit_source":"upstream_provider_shared_pool","remedy_hint":"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider r
+deepseek-v4-pro|cot-told-fs|8    finished=5 found=9 err=None $0.062
+deepseek-v4-pro|cot-told-fs|1    finished=6 found=9 err=None $0.069
+deepseek-v4.1-flash|cot-told-fs|8 finished=5 found=9 err=None $0.010
+deepseek-v4-pro|cot-told-fs|7    finished=5 found=9 err=None $0.101
+deepseek-v4.1-flash|cot-told-fs|9 finished=6 found=9 err=None $0.012
+deepseek-v4-pro|cot-told-fs|5    finished=4 found=9 err=None $0.129
+deepseek-v4-pro|cot-told-fs|3    finished=6 found=9 err=None $0.167
+deepseek-v4.1-flash|cot-told-fs|5 finished=5 found=9 err=None $0.022
+deepseek-v4-pro|cot-told-fs|6    finished=6 found=9 err=None $0.172
+deepseek-v4-pro|cot-told-fs|0    finished=5 found=9 err=None $0.196
+deepseek-v4-pro|cot-told-fs|4    finished=6 found=9 err=None $0.211
+deepseek-v4.1-flash|cot-told-fs|0 finished=6 found=9 err=None $0.024
+deepseek-v4.1-flash|cot-told-fs|7 finished=3 found=9 err=None $0.026
+kimi-k3|cot-told-fs|8            finished=4 found=9 err=None $0.323
+deepseek-v4.1-flash|cot-told-fs|6 finished=6 found=9 err=None $0.028
+deepseek-v4.1-flash|cot-told-fs|1 finished=4 found=9 err=None $0.028
+deepseek-v4.1-flash|cot-told-fs|2 finished=5 found=9 err=None $0.028
+kimi-k3|cot-told-fs|9            finished=5 found=9 err=None $0.414
+deepseek-v4.1-flash|cot-told-fs|4 finished=6 found=9 err=None $0.040
+kimi-k3|cot-told-fs|2            finished=4 found=9 err=None $0.651
+kimi-k3|cot-told-fs|7            finished=5 found=9 err=None $0.709
+kimi-k3|cot-told-fs|6            finished=5 found=9 err=None $0.619
+kimi-k3|cot-told-fs|4            finished=5 found=9 err=None $0.702
+kimi-k3|cot-told-fs|1            finished=4 found=9 err=None $0.703
+kimi-k3|cot-told-fs|0            finished=None found=0 err=protocol: no valid guesses on turn 1 $0.689
+deepseek-v4.1-flash|cot-told-fs|3 finished=6 found=9 err=None $0.067
+kimi-k3|cot-told-fs|3            finished=6 found=9 err=None $0.734
+kimi-k3|cot-told-fs|5            finished=4 found=9 err=None $1.201
