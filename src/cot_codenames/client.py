@@ -28,6 +28,12 @@ _http = httpx.Client(timeout=900, limits=httpx.Limits(max_connections=500, max_k
 RETRYABLE = {408, 429, 500, 502, 503, 504}
 
 
+def tool_choice(thinking: bool) -> str:
+    # "required" + thinking is rejected by several pinned endpoints, so CoT uses "auto". Without CoT, "auto" let
+    # DeepSeek V4.1 Flash reason in its visible reply (stage 1), so force the tool call there.
+    return "auto" if thinking else "required"
+
+
 def chat(model: str, messages: list[dict], tools: list[dict], thinking: bool) -> dict:
     """One completion. Returns {"message": assistant msg dict, "usage": ..., "provider": ..., "latency_s": ...,
     "failed_attempts": [error strings of retried attempts]}."""
@@ -36,7 +42,7 @@ def chat(model: str, messages: list[dict], tools: list[dict], thinking: bool) ->
         "model": slug,
         "messages": messages,
         "tools": tools,
-        "tool_choice": "auto",  # "required" + thinking is rejected by several pinned endpoints; auto everywhere keeps it uniform
+        "tool_choice": tool_choice(thinking),
         "reasoning": {"enabled": thinking},
         "max_tokens": 65536,  # some endpoints default lower (DeepInfra DeepSeek: 16384, which truncated reasoning)
         "provider": {"order": [provider], "allow_fallbacks": False},

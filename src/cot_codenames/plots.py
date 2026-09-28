@@ -1,8 +1,9 @@
-"""Stage 0 graphs from runs/stage-0/games.jsonl -> docs/figs/stage-0-*.png.
+"""Graphs from runs/stage-N/games.jsonl -> docs/figs/stage-N-*.png.
 
-uv run python -m cot_codenames.plots
+uv run python -m cot_codenames.plots --stage 0|1
 """
 
+import argparse
 from pathlib import Path
 
 import matplotlib
@@ -11,12 +12,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cot_codenames.client import DEFAULT_MODELS
 from cot_codenames.game import cond_name, load_games
+from cot_codenames.monitor import grep
 from cot_codenames.prompts import MAX_TURNS
 
-# Reference palette (dataviz skill): categorical slots 1-2 for the two conditions, recessive ink for axes/text.
-COLORS = {"cot": "#2a78d6", "nocot": "#eb6834"}
-LABELS = {"cot": "CoT (thinking on)", "nocot": "no CoT"}
+# Reference palette (dataviz skill): categorical slots 1-4 in fixed order (validated for adjacent pairs), recessive ink
+# for axes/text. A condition keeps its color across stages.
+COLORS = {"cot": "#2a78d6", "cot-told": "#eb6834", "nocot": "#1baf7a", "nocot-told": "#eda100"}
+LABELS = {"cot": "CoT", "cot-told": "CoT, told", "nocot": "no CoT", "nocot-told": "no CoT, told"}
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e7e5e4"
 FIGS = Path("docs/figs")
 
@@ -56,7 +60,7 @@ def strip(ax, models: list[str], values: dict[tuple[str, str], list[float]], yla
             ys = values.get((m, cond), [])
             if not ys:
                 continue
-            x = i + (j - (len(conds) - 1) / 2) * 0.36
+            x = i + (j - (len(conds) - 1) / 2) * 0.8 / len(conds)
             ax.scatter(x + rng.uniform(-0.06, 0.06, len(ys)), ys, s=14, color=COLORS[cond], alpha=0.45, linewidths=0)
             mu, se = np.mean(ys), np.std(ys, ddof=1) / np.sqrt(len(ys)) if len(ys) > 1 else 0.0
             ax.errorbar(x, mu, yerr=se, fmt="_", color=COLORS[cond], markersize=16, markeredgewidth=2, elinewidth=2, capsize=0)
@@ -68,22 +72,61 @@ def strip(ax, models: list[str], values: dict[tuple[str, str], list[float]], yla
         ax.legend(handles=handles, frameon=False, loc="upper left", fontsize=9)
 
 
-def main() -> None:
-    games = [g for g in load_games(Path("runs/stage-0/games.jsonl")) if not g["error"]]
-    models = sorted({g["model"] for g in games})
-    FIGS.mkdir(parents=True, exist_ok=True)
+def grouped(games: list[dict], f) -> dict[tuple[str, str], list[float]]:
+    out: dict[tuple[str, str], list[float]] = {}
+    for g in games:
+        out.setdefault((g["model"], cond_name(g["condition"])), []).extend(f(g))
+    return out
 
-    def by(f) -> dict[tuple[str, str], list[float]]:
-        out: dict[tuple[str, str], list[float]] = {}
-        for g in games:
-            out.setdefault((g["model"], cond_name(g["condition"])), []).extend(f(g))
-        return out
 
-    # 1. Turns to finish (unfinished games plotted at MAX_TURNS + 1, i.e. censored).
-    fig, ax = plt.subplots(figsize=(7, 3.6))
-    strip(ax, models, by(lambda g: [g["turns_to_finish"] or MAX_TURNS + 1]), "turns to finish", "Turns to find all 9 team words")
+def turns_fig(ax, models: list[str], games: list[dict]) -> None:
+    """Turns to finish; unfinished games plotted at MAX_TURNS + 1 (censored)."""
+    strip(
+        ax, models, grouped(games, lambda g: [g["turns_to_finish"] or MAX_TURNS + 1]), "turns to finish", "Turns to find all 9 team words"
+    )
     ax.axhline(MAX_TURNS + 1, color=MUTED, lw=1, ls=":")
     ax.text(len(models) - 0.5, MAX_TURNS + 1.1, "did not finish", color=MUTED, fontsize=8, ha="right")
+
+
+def stage1(games: list[dict]) -> None:
+    models = [m for m in DEFAULT_MODELS if any(g["model"] == m for g in games)]
+    fig, ax = plt.subplots(figsize=(8, 3.8))
+    turns_fig(ax, models, games)
+    fig.tight_layout()
+    fig.savefig(FIGS / "stage-1-turns.png")
+
+    leaks = [g | {"grep": grep(g)} for g in games]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 3.8))
+    strip(
+        axes[0],
+        models,
+        grouped(leaks, lambda g: [100 * g["grep"]["frac_turns_leaked"]]),
+        "% of turns",
+        "Spymaster turns naming a board word",
+    )
+    distinct = grouped(leaks, lambda g: [g["grep"]["distinct_team"] + g["grep"]["distinct_neutral"]])
+    strip(axes[1], models, distinct, "board words (of 25)", "Distinct board words the spymaster wrote")
+    fig.tight_layout()
+    fig.savefig(FIGS / "stage-1-leak.png")
+    print(f"wrote 2 figs to {FIGS} from {len(games)} games")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--stage", type=int, required=True)
+    args = ap.parse_args()
+    # Protocol errors are results (the model failed to move), so they stay; infra/crash records are dropped.
+    games = [g for g in load_games(Path(f"runs/stage-{args.stage}/games.jsonl")) if g.get("error_kind") in (None, "protocol")]
+    FIGS.mkdir(parents=True, exist_ok=True)
+    if args.stage == 1:
+        stage1(games)
+        return
+    models = sorted({g["model"] for g in games})
+    by = lambda f: grouped(games, f)
+
+    # 1. Turns to finish.
+    fig, ax = plt.subplots(figsize=(7, 3.6))
+    turns_fig(ax, models, games)
     fig.tight_layout()
     fig.savefig(FIGS / "stage-0-turns.png")
 

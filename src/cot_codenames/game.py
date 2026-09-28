@@ -11,7 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from cot_codenames import prompts as P
-from cot_codenames.client import MODELS, chat
+from cot_codenames.client import MODELS, chat, tool_choice
 
 SRC = Path(__file__).parent
 WORDLIST = [w for w in (SRC / "wordlist.txt").read_text().split("\n") if w]
@@ -129,7 +129,7 @@ def play(model: str, condition: dict, seed: int) -> dict:
         "model": model,
         "condition": condition,
         "seed": seed,
-        "config": {"code_hash": CODE_HASH, "slug": slug, "provider": provider} | GIT,
+        "config": {"code_hash": CODE_HASH, "slug": slug, "provider": provider, "tool_choice": tool_choice(thinking)} | GIT,
         "team": team,
         "neutral": neutral,
         "board_order": board_order,
