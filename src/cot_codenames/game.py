@@ -26,13 +26,15 @@ CLUE_RE = re.compile(r"[a-z]+")
 
 
 def cond_name(condition: dict) -> str:
-    return ("cot" if condition["thinking"] else "nocot") + ("-told" if condition.get("told") else "")
+    name = ("cot" if condition["thinking"] else "nocot") + ("-told" if condition.get("told") else "")
+    return name + ("-fs" if condition.get("fewshot") else "")
 
 
 def system_prompt(role: str, condition: dict) -> str:
     base, tool = (P.SPYMASTER_SYSTEM, "submit_clue") if role == "spymaster" else (P.GUESSER_SYSTEM, "submit_guesses")
-    told = P.TOLD_SUFFIX if role == "spymaster" and condition.get("told") else ""
-    return base + told + (P.cot_suffix(tool) if condition["thinking"] else P.NO_COT_SUFFIX)
+    spy = role == "spymaster"
+    told = (P.TOLD_SUFFIX if condition.get("told") else "") + (P.FEWSHOT_SUFFIX if condition.get("fewshot") else "")
+    return base + (told if spy else "") + (P.cot_suffix(tool) if condition["thinking"] else P.NO_COT_SUFFIX)
 
 
 def check_clue(args: dict, board: list[str]) -> str | None:

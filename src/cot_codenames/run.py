@@ -17,6 +17,7 @@ CONDITIONS = {
     "nocot": {"thinking": False, "told": False},
     "cot-told": {"thinking": True, "told": True},
     "nocot-told": {"thinking": False, "told": True},
+    "cot-told-fs": {"thinking": True, "told": True, "fewshot": True},  # + worked examples of label-only reasoning
 }
 
 
