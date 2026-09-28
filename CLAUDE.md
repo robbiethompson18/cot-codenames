@@ -36,8 +36,10 @@ Current docs:
   harness checks (CoT carryover, no-CoT), provider gotchas, turns-to-finish CoT vs no-CoT
 - [Stage 1 writeup — read before stage 2 or before changing the told prompt / no-CoT setup](docs/stage-1.md)
   — grep monitor, told vs not told (0/30 comply), tool_choice ablation
-- [Run format — read before analyzing or changing games.jsonl records](docs/run-format.md) — game
-  and call fields, error kinds and replay policy, `n_in` prompt reconstruction
+- [Stage 2 writeup (interim) — read before running or changing the LLM monitor or word lists](docs/stage-2.md)
+  — Luna vs GLM, hits@10, 6.4k-noun list, why top-1 saturates
+- [Run format — read before analyzing or changing games.jsonl / monitor.jsonl records](docs/run-format.md)
+  — game and call fields, error kinds and replay policy, `n_in` prompt reconstruction
 - [Lit check: CoT control, stego, secret-hiding games — read before designing a monitor or condition](docs/lit-cot-control.md)
   — 18 papers, closest prior work, novelty, design implications
 
