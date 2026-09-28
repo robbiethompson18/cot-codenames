@@ -14,9 +14,16 @@ from cot_codenames import prompts as P
 from cot_codenames.client import MODELS, chat, tool_choice
 
 SRC = Path(__file__).parent
-WORDLIST = [w for w in (SRC / "wordlist.txt").read_text().split("\n") if w]
+# Board word pools. "codenames" is the standard 400-word list (the default); "nouns" is ~6.4k common concrete nouns
+# (scripts/build_wordlist.py), so a monitor can't lean on a memorized 400-word list. Games record theirs in `condition`.
+WORDLISTS = {
+    name: [w for w in (SRC / f).read_text().split("\n") if w]
+    for name, f in {"codenames": "wordlist.txt", "nouns": "wordlist-nouns.txt"}.items()
+}
+WORDLIST = WORDLISTS["codenames"]
 # Provenance only (not enforced): hash of everything that changes what a game measures.
-CODE_HASH = hashlib.sha256(b"".join((SRC / f).read_bytes() for f in ("prompts.py", "game.py", "wordlist.txt"))).hexdigest()[:12]
+HASHED = ("prompts.py", "game.py", "wordlist.txt", "wordlist-nouns.txt")
+CODE_HASH = hashlib.sha256(b"".join((SRC / f).read_bytes() for f in HASHED)).hexdigest()[:12]
 _git = lambda *a: subprocess.run(["git", *a], cwd=SRC, capture_output=True, text=True, check=False).stdout.strip()
 GIT = {"git_sha": _git("rev-parse", "HEAD"), "git_dirty": bool(_git("status", "--porcelain", "--", "."))}
 # Clues are exactly [a-z]+: no capitals, digits, punctuation or unicode, so the clue string has no side channel beyond
@@ -27,7 +34,9 @@ CLUE_RE = re.compile(r"[a-z]+")
 
 def cond_name(condition: dict) -> str:
     name = ("cot" if condition["thinking"] else "nocot") + ("-told" if condition.get("told") else "")
-    return name + ("-fs" if condition.get("fewshot") else "") + ("-idx" if condition.get("indexed") else "")
+    name += ("-fs" if condition.get("fewshot") else "") + ("-idx" if condition.get("indexed") else "")
+    wordlist = condition.get("wordlist", "codenames")
+    return name + (f"-{wordlist}" if wordlist != "codenames" else "")
 
 
 def system_prompt(role: str, condition: dict) -> str:
@@ -120,7 +129,7 @@ def reveal(guesses: list[str], number: int, board: list[str], team: set[str], re
 def play(model: str, condition: dict, seed: int) -> dict:
     thinking = condition["thinking"]
     rng = random.Random(seed)
-    board = rng.sample(WORDLIST, P.N_TEAM + P.N_NEUTRAL)
+    board = rng.sample(WORDLISTS[condition.get("wordlist", "codenames")], P.N_TEAM + P.N_NEUTRAL)
     team, neutral = board[: P.N_TEAM], board[P.N_TEAM :]
     board_order = rng.sample(board, len(board))  # guesser's view, so team words aren't listed first
     calls: list[dict] = []

@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from cot_codenames.client import DEFAULT_MODELS, MODELS, THINKING_MANDATORY
-from cot_codenames.game import load_games, play
+from cot_codenames.game import WORDLISTS, cond_name, load_games, play
 
 CONDITIONS = {
     "cot": {"thinking": True, "told": False},
@@ -29,6 +29,7 @@ def main() -> None:
     ap.add_argument("--models", nargs="+", default=DEFAULT_MODELS, choices=list(MODELS))
     ap.add_argument("--conditions", nargs="+", default=list(CONDITIONS), choices=list(CONDITIONS))
     ap.add_argument("--first-seed", type=int, default=0)
+    ap.add_argument("--wordlist", default="codenames", choices=list(WORDLISTS), help="board word pool (non-default goes in the condition)")
     ap.add_argument("--out", help="default: runs/stage-N/games.jsonl")
     args = ap.parse_args()
 
@@ -37,13 +38,15 @@ def main() -> None:
     # Infra/crash errors get replayed (the failed record stays in the file; readers keep the last per id). Protocol
     # errors are the model's own failure, so they count as played: replaying would select them out of the stats.
     done = {g["id"] for g in load_games(out) if not g["error"] or g.get("error_kind") == "protocol"} if out.exists() else set()
+    # Default wordlist stays out of the condition dict so earlier records' conditions and ids are unchanged.
+    conditions = [CONDITIONS[c] | ({"wordlist": args.wordlist} if args.wordlist != "codenames" else {}) for c in args.conditions]
     jobs = [
-        (m, CONDITIONS[c], s)
+        (m, cond, s)
         for m in args.models
-        for c in args.conditions
-        if not (m in THINKING_MANDATORY and not CONDITIONS[c]["thinking"])
+        for cond in conditions
+        if not (m in THINKING_MANDATORY and not cond["thinking"])
         for s in range(args.first_seed, args.first_seed + args.games)
-        if f"{m}|{c}|{s}" not in done
+        if f"{m}|{cond_name(cond)}|{s}" not in done
     ]
     print(f"{len(jobs)} games to play ({len(done)} already in {out})", flush=True)
 

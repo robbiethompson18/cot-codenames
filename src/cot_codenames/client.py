@@ -16,6 +16,7 @@ MODELS = {
     "deepseek-v4-pro": ("deepseek/deepseek-v4-pro-0813", "together"),
     "qwen3.8-27b": ("qwen/qwen3.8-27b", "deepinfra/bf16"),  # cheap dev-loop model
     "deepseek-v4.1-flash": ("deepseek/deepseek-v4.1-flash", "deepinfra/fp8"),
+    "gpt-5.6-luna": ("openai/gpt-5.6-luna", "openai"),  # stage-2 monitor candidate (closed, cheapest frontier per token)
 }
 # OpenRouter rejects reasoning={"enabled": False} for these on every provider we tried ("Reasoning is mandatory").
 THINKING_MANDATORY = {"glm-5.3", "qwen3.8-2.4t"}
