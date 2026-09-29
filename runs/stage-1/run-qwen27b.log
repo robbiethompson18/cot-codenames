@@ -1,0 +1,21 @@
+20 games to play (180 already in runs/stage-1/games.jsonl)
+qwen3.8-27b|cot|2                finished=8 found=9 err=None $0.021
+qwen3.8-27b|cot|4                finished=8 found=9 err=None $0.027
+qwen3.8-27b|cot|9                finished=5 found=9 err=None $0.033
+qwen3.8-27b|cot|3                finished=6 found=9 err=None $0.033
+qwen3.8-27b|cot|0                finished=8 found=9 err=None $0.040
+qwen3.8-27b|cot|7                finished=6 found=9 err=None $0.048
+qwen3.8-27b|cot|8                finished=5 found=9 err=None $0.047
+qwen3.8-27b|cot|1                finished=7 found=9 err=None $0.054
+qwen3.8-27b|cot-told|2           finished=None found=0 err=protocol: no valid clue on turn 1 $0.061
+qwen3.8-27b|cot-told|7           finished=6 found=9 err=None $0.065
+10 games to play (190 already in runs/stage-1/games.jsonl)
+qwen3.8-27b|cot-told|9           finished=8 found=9 err=None $0.015
+qwen3.8-27b|cot-told|6           finished=6 found=9 err=None $0.035
+qwen3.8-27b|cot-told|0           finished=8 found=9 err=None $0.050
+qwen3.8-27b|cot|6                finished=6 found=9 err=None $0.048
+qwen3.8-27b|cot|5                finished=6 found=9 err=None $0.107
+qwen3.8-27b|cot-told|1           finished=6 found=9 err=None $0.087
+qwen3.8-27b|cot-told|8           finished=5 found=9 err=None $0.131
+qwen3.8-27b|cot-told|3           finished=6 found=9 err=None $0.143
+qwen3.8-27b|cot-told|4           finished=6 found=9 err=None $0.215

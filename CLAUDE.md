@@ -42,6 +42,9 @@ Current docs:
   — game and call fields, error kinds and replay policy, `n_in` prompt reconstruction
 - [Lit check: CoT control, stego, secret-hiding games — read before designing a monitor or condition](docs/lit-cot-control.md)
   — 18 papers, closest prior work, novelty, design implications
+- [Related work: why CoT control fails and what raised it — read before designing a stronger told condition or CoT fine-tuning](docs/related-work.md)
+  — CoT-Control ("chromosome") details, ReasonIF, white-bear rebound, prompting/SFT elicitation
+  numbers, grid-index hiding idea
 
 <!-- As docs are added under docs/, list them here, one per line: -->
 <!-- - [Title — when to read](docs/foo.md) — short gloss -->

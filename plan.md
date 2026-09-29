@@ -46,6 +46,8 @@ example games before the next stage starts.
 - **Control: clue-only monitor.** The CoT contains the clue, so a monitor can act like a guesser.
   Leak = P(win | CoT) − P(win | public clues only). Chance = 25/400.
 - Graphs: monitor win rate (CoT / clue-only / chance) by model × told; grep vs LLM (paraphrase).
+- Make sure the monitor has the list of the 400 possible words! Should ablate on the first go around
+  (full 400 word list vs not)
 
 ## Stage 3: v2 monitor with boards
 
@@ -58,6 +60,8 @@ example games before the next stage starts.
 - more words in bank
 - more models
 - CoT length
+- Are models better if we relax the 'thinking happens in CoT' rule and let them think outside the
+  `submit` tool? They're more self-aware of this text...
 - etc
 
 ## Stage 5 (stretch): RL
