@@ -33,7 +33,8 @@ CLUE_RE = re.compile(r"[a-z]+")
 
 
 def cond_name(condition: dict) -> str:
-    name = ("cot" if condition["thinking"] else "nocot") + ("-told" if condition.get("told") else "")
+    name = "cot" if condition["thinking"] else "vis" if condition.get("visible") else "nocot"
+    name += ("-told" if condition.get("told") else "") + (f"-{condition['effort']}" if condition.get("effort") else "")
     name += ("-fs" if condition.get("fewshot") else "") + ("-idx" if condition.get("indexed") else "")
     wordlist = condition.get("wordlist", "codenames")
     return name + (f"-{wordlist}" if wordlist != "codenames" else "")
@@ -44,7 +45,11 @@ def system_prompt(role: str, condition: dict) -> str:
     spy = role == "spymaster"
     told = (P.TOLD_SUFFIX if condition.get("told") else "") + (P.INDEXED_SUFFIX if condition.get("indexed") else "")
     told += P.FEWSHOT_SUFFIX if condition.get("fewshot") else ""
-    return base + (told if spy else "") + (P.cot_suffix(tool) if condition["thinking"] else P.NO_COT_SUFFIX)
+    if condition["thinking"]:
+        mode = P.cot_suffix(tool)
+    else:
+        mode = P.visible_suffix(tool) if condition.get("visible") else P.NO_COT_SUFFIX
+    return base + (told if spy else "") + mode
 
 
 def check_clue(args: dict, board: list[str]) -> str | None:
@@ -61,8 +66,8 @@ def check_clue(args: dict, board: list[str]) -> str | None:
 
 
 class Agent:
-    def __init__(self, role: str, model: str, thinking: bool, system: str, tool: dict, nudge: str, calls: list[dict]):
-        self.role, self.model, self.thinking, self.tool, self.nudge, self.calls = role, model, thinking, tool, nudge, calls
+    def __init__(self, role: str, model: str, condition: dict, system: str, tool: dict, nudge: str, calls: list[dict]):
+        self.role, self.model, self.condition, self.tool, self.nudge, self.calls = role, model, condition, tool, nudge, calls
         self.messages: list[dict] = [{"role": "system", "content": system}]
         self.pending_call_ids: list[str] = []
 
@@ -79,7 +84,7 @@ class Agent:
         name = self.tool["function"]["name"]
         for attempt in range(3):
             n_in = len(self.messages)
-            r = chat(self.model, self.messages, [self.tool], self.thinking)
+            r = chat(self.model, self.messages, [self.tool], self.condition)
             msg = r["message"]
             self.messages.append(msg)
             call = {"role": self.role, "turn": turn, "attempt": attempt, "n_in": n_in, "generation_id": r["id"], "served_model": r["model"]}
@@ -127,21 +132,20 @@ def reveal(guesses: list[str], number: int, board: list[str], team: set[str], re
 
 
 def play(model: str, condition: dict, seed: int) -> dict:
-    thinking = condition["thinking"]
     rng = random.Random(seed)
     board = rng.sample(WORDLISTS[condition.get("wordlist", "codenames")], P.N_TEAM + P.N_NEUTRAL)
     team, neutral = board[: P.N_TEAM], board[P.N_TEAM :]
     board_order = rng.sample(board, len(board))  # guesser's view, so team words aren't listed first
     calls: list[dict] = []
-    spy = Agent("spymaster", model, thinking, system_prompt("spymaster", condition), P.SUBMIT_CLUE, P.NUDGE_CLUE, calls)
-    gus = Agent("guesser", model, thinking, system_prompt("guesser", condition), P.SUBMIT_GUESSES, P.NUDGE_GUESS, calls)
+    spy = Agent("spymaster", model, condition, system_prompt("spymaster", condition), P.SUBMIT_CLUE, P.NUDGE_CLUE, calls)
+    gus = Agent("guesser", model, condition, system_prompt("guesser", condition), P.SUBMIT_GUESSES, P.NUDGE_GUESS, calls)
     slug, provider = MODELS[model]
     game = {
         "id": f"{model}|{cond_name(condition)}|{seed}",
         "model": model,
         "condition": condition,
         "seed": seed,
-        "config": {"code_hash": CODE_HASH, "slug": slug, "provider": provider, "tool_choice": tool_choice(thinking)} | GIT,
+        "config": {"code_hash": CODE_HASH, "slug": slug, "provider": provider, "tool_choice": tool_choice(model, condition)} | GIT,
         "team": team,
         "neutral": neutral,
         "board_order": board_order,

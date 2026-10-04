@@ -5,10 +5,13 @@ import time
 
 import httpx
 
+from cot_codenames import anthropic_client
+
 # short name -> (OpenRouter slug, pinned provider), no fallbacks. All open weights (hugging_face_id on OpenRouter).
 # First-party where possible. DeepSeek's own endpoint is blocked by our account's no-training privacy setting, so
 # Together (DeepInfra caps its output at 16k tokens, which truncated reasoning). Qwen3.8-27B on Alibaba drops
-# prior-turn reasoning, so DeepInfra. See docs/stage-0.md.
+# prior-turn reasoning, so DeepInfra. See docs/stage-0.md. Claude models go to Anthropic's API directly (ANTHROPIC).
+ANTHROPIC = "anthropic-api"
 MODELS = {
     "kimi-k3": ("moonshotai/kimi-k3", "moonshotai"),
     "glm-5.3": ("z-ai/glm-5.3", "z-ai"),
@@ -17,9 +20,13 @@ MODELS = {
     "qwen3.8-27b": ("qwen/qwen3.8-27b", "deepinfra/bf16"),  # cheap dev-loop model
     "deepseek-v4.1-flash": ("deepseek/deepseek-v4.1-flash", "deepinfra/fp8"),
     "gpt-5.6-luna": ("openai/gpt-5.6-luna", "openai"),  # stage-2 monitor candidate (closed, cheapest frontier per token)
+    "claude-sonnet-5.5": ("claude-sonnet-5-5", ANTHROPIC),  # stage 3: closed; its reasoning is a summary
+    "claude-opus-5.5": ("claude-opus-5-5", ANTHROPIC),
+    "claude-fable-5.1": ("claude-fable-5-1", ANTHROPIC),
 }
 # OpenRouter rejects reasoning={"enabled": False} for these on every provider we tried ("Reasoning is mandatory").
-THINKING_MANDATORY = {"glm-5.3", "qwen3.8-2.4t"}
+# Claude: see anthropic_client.chat (Sonnet 5.5 can turn thinking off, but the no-CoT `visible` prompt gets refused).
+THINKING_MANDATORY = {"glm-5.3", "qwen3.8-2.4t", "claude-sonnet-5.5", "claude-opus-5.5", "claude-fable-5.1"}
 # What we run and show from stage 1 on: the models with a no-CoT arm (so not THINKING_MANDATORY), minus the dev model.
 DEFAULT_MODELS = ["kimi-k3", "deepseek-v4-pro", "deepseek-v4.1-flash"]
 
@@ -29,23 +36,31 @@ _http = httpx.Client(timeout=900, limits=httpx.Limits(max_connections=500, max_k
 RETRYABLE = {408, 429, 500, 502, 503, 504}
 
 
-def tool_choice(thinking: bool) -> str:
+def tool_choice(model: str, condition: dict) -> str:
+    if MODELS[model][1] == ANTHROPIC:
+        return "auto"  # forced tool use is a 400 on current Claude models
     # "required" + thinking is rejected by several pinned endpoints, so CoT uses "auto". Without CoT, "auto" let
-    # DeepSeek V4.1 Flash reason in its visible reply (stage 1), so force the tool call there.
-    return "auto" if thinking else "required"
+    # DeepSeek V4.1 Flash reason in its visible reply (stage 1), so force the tool call there, except in the `visible`
+    # condition, whose whole point is reasoning in the reply ("required" suppresses reply text).
+    return "auto" if condition["thinking"] or condition.get("visible") else "required"
 
 
-def chat(model: str, messages: list[dict], tools: list[dict], thinking: bool) -> dict:
-    """One completion. Returns {"message": assistant msg dict, "usage": ..., "provider": ..., "latency_s": ...,
-    "failed_attempts": [error strings of retried attempts]}."""
+def chat(model: str, messages: list[dict], tools: list[dict], condition: dict) -> dict:
+    """One completion. Uses condition["thinking"], ["effort"] (reasoning effort, optional) and ["visible"]. Returns
+    {"message": assistant msg dict, "usage": ..., "provider": ..., "latency_s": ..., "failed_attempts": [...]}."""
     slug, provider = MODELS[model]
+    if provider == ANTHROPIC:
+        return anthropic_client.chat(slug, messages, tools, condition)
+    effort = {"effort": condition["effort"]} if condition.get("effort") else {}
     body = {
         "model": slug,
         "messages": messages,
         "tools": tools,
-        "tool_choice": tool_choice(thinking),
-        "reasoning": {"enabled": thinking},
-        "max_tokens": 65536,  # some endpoints default lower (DeepInfra DeepSeek: 16384, which truncated reasoning)
+        "tool_choice": tool_choice(model, condition),
+        "reasoning": {"enabled": condition["thinking"]} | effort,
+        # Some endpoints default lower (DeepInfra DeepSeek: 16384, which truncated reasoning). High effort gets 128k (every
+        # pinned endpoint allows it): DeepSeek V4 Pro's turn-1 CoT at high effort ran past 65k in the stage-3 probe.
+        "max_tokens": 128000 if condition.get("effort") == "high" else 65536,
         "provider": {"order": [provider], "allow_fallbacks": False},
         "usage": {"include": True},
     }

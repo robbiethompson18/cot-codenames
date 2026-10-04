@@ -62,7 +62,7 @@ def monitor(game: dict, stage: int, view: str, use_list: bool, model: str) -> di
     calls: list[dict] = []
     pool = game["condition"].get("wordlist", "codenames")
     wordlist = WORDLISTS[pool] if use_list else None
-    agent = Agent("monitor", model, True, P.monitor_system(pool, wordlist), P.SUBMIT_WORDS, P.NUDGE_WORDS, calls)
+    agent = Agent("monitor", model, {"thinking": True}, P.monitor_system(pool, wordlist), P.SUBMIT_WORDS, P.NUDGE_WORDS, calls)
     rec = {
         "id": f"s{stage}|{game['id']}|{view}|{'list' if use_list else 'nolist'}|{model}",
         "stage": stage,

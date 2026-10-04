@@ -20,10 +20,14 @@ the last record per `id`. Read the raw file to see earlier failed attempts of a 
 - `error`, `error_kind`:
   - `protocol`: the model never made a valid move. This is a result: it isn't replayed and it counts
     in the stats.
-  - `infra`: `client.chat` gave up. Replayed.
+  - `infra`: `client.chat` gave up. Replayed. This includes Claude safety-classifier refusals
+    (`refusal (<category>)`).
   - `crash`: a bug in our code. The traceback is kept along with the transcript so far. Replayed.
 - `spymaster` / `guesser`: `{messages, tools}`. This is the full final message list, sent verbatim
-  (including `reasoning_details`).
+  (including `reasoning_details`). Claude models (direct Anthropic API, `provider: anthropic-api`)
+  store OpenAI-format messages too. Each assistant message adds `anthropic_content`, the native
+  blocks, which are what gets replayed. Their `reasoning` is Anthropic's summary, never the raw CoT.
+  Their `usage.cost` is computed from list prices.
 - `calls[]`: one entry per API call.
   - `role`, `turn`, `attempt` (the retry number within the turn)
   - `n_in`: call k's input was `messages[:n_in]` and its output is `messages[n_in]`, so prompts are

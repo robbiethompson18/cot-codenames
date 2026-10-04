@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Codenames with a CoT monitor: can open-weight reasoning models play spymaster without leaking board words in their chain of thought?"
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic>=1.9.0",
     "httpx>=0.28.1",
     "matplotlib>=3.11.2",
 ]

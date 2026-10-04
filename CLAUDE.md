@@ -45,11 +45,16 @@ Current docs:
 - [Related work: why CoT control fails and what raised it — read before designing a stronger told condition or CoT fine-tuning](docs/related-work.md)
   — CoT-Control ("chromosome") details, ReasonIF, white-bear rebound, prompting/SFT elicitation
   numbers, grid-index hiding idea
+- [Taboo / Person Do Thing — read before extending the one-call taboo/PDT sweep (supersedes Codenames plan)](docs/taboo.md)
+  — setup, 11-arm results table, CoT fixes PDT rule-breaking, Claude-low = 0 thinking, failure modes
 
 <!-- As docs are added under docs/, list them here, one per line: -->
 <!-- - [Title — when to read](docs/foo.md) — short gloss -->
 
 ## Operator Notes
+
+**Never call Anthropic models through OpenRouter:** Robbie has Anthropic credits, so use the
+Anthropic API directly.
 
 ** Maximum parallelism always:** Just kick off requests to OpenRoute in parallel, up to 500. If we
 get rate limited lmk.

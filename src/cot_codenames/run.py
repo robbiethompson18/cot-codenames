@@ -19,6 +19,11 @@ CONDITIONS = {
     "nocot-told": {"thinking": False, "told": True},
     "cot-told-fs": {"thinking": True, "told": True, "fewshot": True},  # + worked examples of label-only reasoning
     "cot-told-fs-idx": {"thinking": True, "told": True, "fewshot": True, "indexed": True},  # + pre-labeled board
+    # Stage 3: thinking off but reasoning required in the visible reply; and CoT at low/high reasoning effort.
+    "vis": {"thinking": False, "visible": True, "told": False},
+    "vis-told": {"thinking": False, "visible": True, "told": True},
+    "cot-told-low": {"thinking": True, "told": True, "effort": "low"},
+    "cot-told-high": {"thinking": True, "told": True, "effort": "high"},
 }
 
 
@@ -31,6 +36,8 @@ def main() -> None:
     ap.add_argument("--first-seed", type=int, default=0)
     ap.add_argument("--wordlist", default="codenames", choices=list(WORDLISTS), help="board word pool (non-default goes in the condition)")
     ap.add_argument("--out", help="default: runs/stage-N/games.jsonl")
+    # Together's shared DeepSeek V4 Pro pool 429s for minutes when ~100 games start at once (stage 3: 73 games gave up).
+    ap.add_argument("--workers", type=int, default=500, help="max games in flight")
     args = ap.parse_args()
 
     out = Path(args.out or f"runs/stage-{args.stage}/games.jsonl")
@@ -60,7 +67,7 @@ def main() -> None:
         print(f"{g['id']:32} finished={g['turns_to_finish']} found={g['found']} err={err} ${cost:.3f}", flush=True)
 
     # Games are sequential inside (turn t needs turn t-1), so all the parallelism is across games. 500 = client pool size.
-    with ThreadPoolExecutor(min(max(len(jobs), 1), 500)) as pool:
+    with ThreadPoolExecutor(min(max(len(jobs), 1), args.workers)) as pool:
         list(pool.map(one, jobs))
 
 
