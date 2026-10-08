@@ -35,3 +35,15 @@ dev = [
     "ty>=0.0.84",
     "wordfreq>=3.1.1",
 ]
+tinker = [
+    "tinker>=0.32.0",
+    "tinker-cookbook>=0.5.7",
+]
+# Local (RunPod) backend of the stego trainer: uv run --group train python -m cot_codenames.stego.train --backend local
+train = [
+    "accelerate",
+    "huggingface-hub",
+    "peft",
+    "torch",
+    "transformers",
+]

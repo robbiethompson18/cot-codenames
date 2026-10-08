@@ -1,10 +1,10 @@
 # Lit check: CoT control, stego, and secret-hiding games
 
-Stage-0 lit check for [plan.md](../plan.md). Compiled 2026-09-28 via web search; numbers come from
-abstracts or HTML full text unless marked (unverified). Text after → says how each item bears on
-this project. Skipped as too distant: Motwani et al. 2024 (arXiv:2402.07510, secret collusion) and
-Guan et al. 2025 (arXiv:2512.18311, OpenAI "Monitoring Monitorability": longer CoT is more
-monitorable).
+Stage-0 lit check for [codenames-plan.md](codenames-plan.md). Compiled 2026-09-28 via web search;
+numbers come from abstracts or HTML full text unless marked (unverified). Text after → says how each
+item bears on this project. Skipped as too distant: Motwani et al. 2024 (arXiv:2402.07510, secret
+collusion) and Guan et al. 2025 (arXiv:2512.18311, OpenAI "Monitoring Monitorability": longer CoT is
+more monitorable).
 
 ## 1. CoT controllability and obfuscation under monitoring
 
@@ -54,8 +54,8 @@ alternative "told" manipulation. Omission looks like hiding unless we also track
 of Promoting Obfuscation._ arXiv:2503.11926 (OpenAI). A GPT-4o CoT monitor catches o3-mini's reward
 hacking far better than an action-only monitor (about 95% vs 60% recall, unverified number). Putting
 the CoT monitor into the RL reward leads to obfuscated reward hacking. → This is the canonical
-result behind "RL would fix it fast" in plan.md. Stage 5 should expect hiding plus a residual leak
-that the trained-against monitor misses but a fresh monitor catches.
+result behind "RL would fix it fast" in codenames-plan.md. Stage 5 should expect hiding plus a
+residual leak that the trained-against monitor misses but a fresh monitor catches.
 
 **Korbak, Balesni, Barnes, Bengio, Benton et al., 41 authors (2025).** _Chain of Thought
 Monitorability: A New and Fragile Opportunity for AI Safety._ arXiv:2507.11473. Position paper. CoT

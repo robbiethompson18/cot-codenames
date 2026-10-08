@@ -20,3 +20,6 @@ dist/
 *.swp
 .idea/
 .vscode/
+
+# Stego training runs: checkpoints and rollouts go to the Hugging Face repo, not git
+runs/stego/

@@ -30,8 +30,10 @@ See `~/.claude/personal-repo-rules.md` (imported above) for the full convention.
 
 Current docs:
 
-- [Plan — staged build plan; read before starting any stage](plan.md) — stages 0–5, each with a
-  writeup, graphs, and example games to check
+- [Plan — current plan: steganography organism and the interp transfer grid; read before touching `src/cot_codenames/stego/`](plan.md)
+  — game, reward, two training backends (RunPod, Tinker), spike rungs, stopping rule
+- [Codenames plan (superseded) — read only for the history behind stages 0–3](docs/codenames-plan.md)
+  — stages 0–5 of the original Codenames build, plus the Taboo pivot
 - [Stage 0 writeup — read before stage 1 or before changing models/providers](docs/stage-0.md) —
   harness checks (CoT carryover, no-CoT), provider gotchas, turns-to-finish CoT vs no-CoT
 - [Stage 1 writeup — read before stage 2 or before changing the told prompt / no-CoT setup](docs/stage-1.md)
@@ -52,6 +54,9 @@ Current docs:
 <!-- - [Title — when to read](docs/foo.md) — short gloss -->
 
 ## Operator Notes
+
+**Stego runs live on Hugging Face, not git:** `runs/stego/` is gitignored; checkpoints and rollouts
+upload to `robbiethompson2018/cot-codenames-stego` via `--hf-repo`.
 
 **Never call Anthropic models through OpenRouter:** Robbie has Anthropic credits, so use the
 Anthropic API directly.

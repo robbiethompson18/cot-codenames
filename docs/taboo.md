@@ -55,9 +55,12 @@ passed the PDT rule. `rtok` = median reasoning tokens.
 3. **Compliance costs communication.** Clean PDT descriptions get guessed 2–25% of the time vs
    29–41% for rule-breaking ones. Kimi-high is legal but vague ("person and person, same" → twin
    works; most don't). Luna isn't a great PDT guesser either, so hit rates are floors.
-4. **Violations are mostly grammar words, not smuggled content.** Top illegal words: a, that, it,
-   is, be, to, the, you, not. Models drift back into normal English. Opus is the exception: few,
-   content-y violations ("water", "hand", "little").
+4. **Most illegal PDT words are grammar words.** PDT is an allowlist with no articles or pronouns,
+   so "a", "it" and "the" are illegal, and they count: strict scoring is the metric. Top illegal
+   words: a, that, it, is, be, to, the, you, not. Models drift back into normal English. The CoT
+   effect isn't just models dropping their articles: ignoring ~60 grammar words, Kimi goes 53 → 27 →
+   2% illegal and DeepSeek 73 → 20 → 23%. Opus is the exception: few, content-y violations ("water",
+   "hand", "little").
 
 ## Failure modes (counted as `nocall`, not as rule violations)
 

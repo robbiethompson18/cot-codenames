@@ -50,7 +50,7 @@
   Kimi 32k→27k, DS Pro 15k→11k, Flash 41k→32k), but n=10.
 - **CoT is still load-bearing:** no-CoT costs 1–3 turns, as in stage 0. So "don't think" isn't a
   free way to hide.
-- This matches plan.md's prediction and CoT-Control (2026, see
+- This matches codenames-plan.md's prediction and CoT-Control (2026, see
   [lit-cot-control.md](lit-cot-control.md)), in a stronger form: 25 load-bearing words and 0/30
   compliance.
 
