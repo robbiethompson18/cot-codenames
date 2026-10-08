@@ -33,20 +33,27 @@ until ssh "${ssh_opts[@]}" "root@$host" true 2>/dev/null; do sleep 5; done
 rsync -az -e "ssh ${ssh_opts[*]}" --exclude .venv --exclude .git --exclude runs --exclude __pycache__ --exclude .ruff_cache \
   --exclude .envrc.local ./ "root@$host:/workspace/cot-codenames/"
 # Keys go into a root-only file on the pod, never into the pod's RunPod config.
-printf 'export HF_TOKEN=%s\nexport ANTHROPIC_API_KEY=%s\nexport HF_HOME=/root/hf\nexport STEGO_GIT_SHA=%s\n' "$HF_TOKEN" "$ANTHROPIC_API_KEY" "$sha" |
+printf 'export HF_TOKEN=%s\nexport ANTHROPIC_API_KEY=%s\nexport HF_HOME=/root/hf\nexport STEGO_GIT_SHA=%s\nexport PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True\n' \
+  "$HF_TOKEN" "$ANTHROPIC_API_KEY" "$sha" |
   ssh "${ssh_opts[@]}" "root@$host" 'umask 077; cat > /root/.stego_env'
 
 args=$(printf '%q ' "$@")
+# STEGO_SETUP=pip uses the image's own torch; `uv sync` re-downloads torch and has stalled for 30+ minutes in some
+# datacenters. Either way \$py is the interpreter the run uses.
+if [ "${STEGO_SETUP:-uv}" = pip ]; then
+  setup='pip install -q --break-system-packages transformers peft accelerate huggingface_hub anthropic && pip install -q --break-system-packages --no-deps -e . ; py=python'
+else
+  setup='pip install -q uv 2>/dev/null; uv sync -q --group train; py="uv run python"'
+fi
 ssh "${ssh_opts[@]}" "root@$host" "cat > /workspace/run_$run.sh" <<REMOTE
 source /root/.stego_env
 cd /workspace/cot-codenames
-pip install -q uv 2>/dev/null
-uv sync -q --group train
-uv run python -m cot_codenames.stego.train --backend local --run $run --hf-repo $repo $args 2>&1 | tee /workspace/$run.log
+$setup
+\$py -m cot_codenames.stego.train --backend local --run $run --hf-repo $repo $args 2>&1 | tee /workspace/$run.log
 # Whether training finished or crashed: keep the log with the run, upload, and release the pod.
 mkdir -p runs/stego/$run && cp /workspace/$run.log runs/stego/$run/train.log
-uv run python -c "from huggingface_hub import upload_folder; upload_folder(repo_id='$repo', folder_path='runs/stego/$run', path_in_repo='runs/$run')"
-runpodctl remove pod \$RUNPOD_POD_ID || runpodctl stop pod \$RUNPOD_POD_ID
+\$py -c "from huggingface_hub import upload_folder; upload_folder(repo_id='$repo', folder_path='runs/stego/$run', path_in_repo='runs/$run')"
+runpodctl remove pod $pod || runpodctl stop pod $pod
 REMOTE
-ssh "${ssh_opts[@]}" "root@$host" "tmux new -d -s $run 'bash /workspace/run_$run.sh'"
+ssh "${ssh_opts[@]}" "root@$host" "tmux kill-server 2>/dev/null; pkill -f 'uv sync' 2>/dev/null; tmux new -d -s $run 'bash /workspace/run_$run.sh'"
 echo "$run: started on $pod ($host:$port)"

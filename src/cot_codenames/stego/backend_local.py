@@ -130,6 +130,9 @@ class LocalBackend:
 
     def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, int]]) -> dict[str, float]:
         self.opt.zero_grad()
+        # Sampling and scoring leave large cached blocks behind; without this the first backward pass runs out of memory.
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
         loss_pg = loss_kl = loss_recv = 0.0
         # Policy gradient on the essay tokens: -advantage * log pi(essay | prompt), summed over tokens, mean over essays.
         for batch in self._batches(sender, self.args.micro_batch):

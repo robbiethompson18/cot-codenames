@@ -178,7 +178,7 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=5e-5)
     ap.add_argument("--lora-rank", type=int, default=32)
     ap.add_argument("--kl-coef", type=float, default=0.0, help="KL penalty towards the base model on essay tokens (local backend)")
-    ap.add_argument("--micro-batch", type=int, default=4, help="sequences per forward/backward pass (local backend)")
+    ap.add_argument("--micro-batch", type=int, default=2, help="sequences per forward/backward pass (local backend)")
     ap.add_argument("--hf-repo", default="", help="upload the run directory here at every eval")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
