@@ -27,6 +27,7 @@ extend-select = [
 
 [tool.ruff.lint.per-file-ignores]
 "src/cot_codenames/dashboard.py" = ["E501"]  # embedded HTML/JS template, not worth wrapping
+"scripts/stego_report/*.py" = ["E501", "SIM115", "RUF015", "PLW1510", "BLE001"]  # one-off HTML report builders
 
 [dependency-groups]
 dev = [
