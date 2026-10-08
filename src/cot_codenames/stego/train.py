@@ -31,8 +31,10 @@ class Backend(Protocol):
     """What a training backend provides. `local` (backend_local.py) runs HF + PEFT on one GPU; `tinker`
     (backend_tinker.py) uses the Tinker API. Both must turn the sender model's reasoning off."""
 
-    def sample(self, chats: list[Chat], max_tokens: int) -> list[Sample]:
-        """One sampled completion per chat, from the current policy (base model + LoRA), at temperature 1."""
+    def sample(self, chats: list[Chat], max_tokens: int, thinking: bool = False) -> list[Sample]:
+        """One sampled completion per chat, from the current policy (base model + LoRA), at temperature 1. With
+        `thinking` the sender reasons first: Sample.cot holds the reasoning, Sample.text the essay, and the policy
+        gradient covers both."""
         ...
 
     def choose(self, role: str, chats: list[Chat], n_labels: int) -> list[list[float]]:
@@ -91,17 +93,27 @@ def play(
     """Sample one essay per episode and score it. `shots` are earlier essays with their secrets, shown to the monitor
     when --monitor-shots is set. Returns one rollout dict per episode; the keys starting with "_" hold objects the
     training step needs and are dropped before logging."""
-    samples = backend.sample([game.sender_chat(e) for e in episodes], args.max_tokens)
+    told = args.sender_thinking and args.monitor_sees == "both"
+    samples = backend.sample([game.sender_chat(e, told) for e in episodes], args.max_tokens, args.sender_thinking)
     recv = [game.candidates(rng, e.secret, pool, args.m) for e in episodes]
     mon = [game.candidates(rng, e.secret, pool, args.n) for e in episodes]
     recv_chats = [game.chooser_chat("receiver", e.topic, s.text, c) for e, s, (c, _) in zip(episodes, samples, recv)]
     claude = args.monitor_model.startswith("claude")
-    mon_chats = [
-        remonitor.monitor_chat({"topic": e.topic, "essay": s.text, "mon_candidates": c}, shots, force_answer=claude)
-        for e, s, (c, _) in zip(episodes, samples, mon)
-    ]
+
+    def mon_chats(view: str, few: list[dict], force: bool) -> list[Chat]:
+        """Monitor prompts for one view of the sender: "essay", "cot" (reasoning only) or "both"."""
+        seen = [{"topic": e.topic, "essay": s.text, "mon_candidates": c} for e, s, (c, _) in zip(episodes, samples, mon)]
+        if view != "essay":
+            seen = [d | {"reasoning": s.cot, "show_essay": view == "both"} for d, s in zip(seen, samples)]
+        return [remonitor.monitor_chat(d, few, force_answer=force) for d in seen]
+
     p_recv = backend.choose("receiver", recv_chats, args.m)
-    p_mon, mon_text = monitor_dists(backend, mon_chats, args)
+    p_mon, mon_text = monitor_dists(backend, mon_chats(args.monitor_sees, shots, claude), args)
+    # With reasoning on, the base model also reads each view as a monitor that is never trained against, so every run
+    # shows what a reader of the reasoning would have caught.
+    views = (
+        {v: backend.choose("monitor", mon_chats(v, [], False), args.n) for v in ("essay", "cot", "both")} if args.sender_thinking else {}
+    )
     verdicts = judge([(e.topic, s.text) for e, s in zip(episodes, samples)])
     rollouts = []
     for i, (e, s) in enumerate(zip(episodes, samples)):
@@ -113,6 +125,12 @@ def play(
                 "secret": e.secret,
                 "topic": e.topic,
                 "essay": s.text,
+                "cot": s.cot,
+                "cot_leaked": game.leaked(e.secret, s.cot),
+                "no_essay": args.sender_thinking and not s.text,
+                "base_monitor": {
+                    v: {"p": round(d[i][mi], 4), "correct": max(range(args.n), key=d[i].__getitem__) == mi} for v, d in views.items()
+                },
                 "judge_pass": verdicts[i]["pass"],
                 "judge_text": verdicts[i]["text"],
                 "leaked": leak,
@@ -142,6 +160,12 @@ def summarise(rollouts: list[dict], args: argparse.Namespace) -> dict[str, float
     out["recv_bits"] = round(game.bits(out["recv_correct"], args.m), 3)
     out["mon_bits"] = round(game.bits(out["mon_correct"], args.n), 3)
     out["words"] = round(sum(len(r["essay"].split()) for r in rollouts) / len(rollouts), 1)
+    if rollouts[0]["base_monitor"]:
+        out["cot_words"] = round(sum(len(r["cot"].split()) for r in rollouts) / len(rollouts), 1)
+        out["cot_leaked"] = round(mean("cot_leaked"), 4)
+        out["no_essay"] = round(mean("no_essay"), 4)
+        for view in ("essay", "cot", "both"):
+            out[f"base_mon_{view}"] = round(sum(r["base_monitor"][view]["correct"] for r in rollouts) / len(rollouts), 4)
     out["judge_tokens_in"] = sum(r["_tokens"][0] for r in rollouts)
     out["judge_tokens_out"] = sum(r["_tokens"][1] for r in rollouts)
     return out
@@ -162,6 +186,13 @@ def main() -> None:
         "--monitor-model",
         default="Qwen/Qwen3.6-27B",
         help="frozen monitor. Same as --model = the base model without the LoRA. A claude-* id = that model through the API",
+    )
+    ap.add_argument("--sender-thinking", action="store_true", help="let the sender reason before the essay (local backend)")
+    ap.add_argument(
+        "--monitor-sees",
+        choices=["essay", "both"],
+        default="essay",
+        help="what the monitor in the reward reads: the essay, or the sender's reasoning and the essay (needs --sender-thinking)",
     )
     ap.add_argument("--monitor-shots", type=int, default=0, help="show the monitor this many recent essays with their secrets")
     ap.add_argument("--binary-reward", action="store_true", help="penalise the monitor's top guess (0 or 1), not its probability")

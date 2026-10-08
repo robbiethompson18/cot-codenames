@@ -50,7 +50,9 @@ class TinkerBackend:
     def _tokens(self, role: str, chat: Chat) -> list[int]:
         return self.renderer[role].build_generation_prompt(chat).to_ints()  # ty: ignore[invalid-argument-type]
 
-    def sample(self, chats: list[Chat], max_tokens: int) -> list[Sample]:
+    def sample(self, chats: list[Chat], max_tokens: int, thinking: bool = False) -> list[Sample]:
+        if thinking:
+            raise NotImplementedError("sender reasoning is only implemented in the local backend")
         renderer = self.renderer["receiver"]
         params = types.SamplingParams(max_tokens=max_tokens, temperature=1.0, stop=renderer.get_stop_sequences())
         # train.py repeats each prompt k times; one request with num_samples=k prefills the prompt once.

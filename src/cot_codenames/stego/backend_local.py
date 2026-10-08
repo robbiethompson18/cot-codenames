@@ -41,8 +41,8 @@ def _load(name: str, device: str):
     return tok, model.to(device).eval()
 
 
-def _render(tok, chat: Chat) -> str:
-    return tok.apply_chat_template(chat, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+def _render(tok, chat: Chat, thinking: bool = False) -> str:
+    return tok.apply_chat_template(chat, tokenize=False, add_generation_prompt=True, enable_thinking=thinking)
 
 
 class LocalBackend:
@@ -78,11 +78,11 @@ class LocalBackend:
             yield items[i : i + size]
 
     @torch.no_grad()
-    def sample(self, chats: list[Chat], max_tokens: int) -> list[Sample]:
+    def sample(self, chats: list[Chat], max_tokens: int, thinking: bool = False) -> list[Sample]:
         out = []
         eos = self.tok.eos_token_id
         for batch in self._batches(chats, NO_GRAD_BATCH):
-            enc = self.tok([_render(self.tok, c) for c in batch], return_tensors="pt", padding=True, add_special_tokens=False).to(
+            enc = self.tok([_render(self.tok, c, thinking) for c in batch], return_tensors="pt", padding=True, add_special_tokens=False).to(
                 self.device
             )
             # Plain temperature-1 sampling, with the checkpoint's default top-k/top-p turned off, so the distribution
@@ -91,9 +91,17 @@ class LocalBackend:
             for chat, prompt_ids, mask, row in zip(batch, enc.input_ids, enc.attention_mask, gen[:, enc.input_ids.shape[1] :].tolist()):
                 # Keep tokens up to and including the first EOS, so the policy is also trained on when to stop.
                 completion = row[: row.index(eos) + 1] if eos in row else row
-                text = self.tok.decode(completion, skip_special_tokens=True).strip()
                 raw = {"prompt_ids": prompt_ids[mask.bool()].tolist(), "completion_ids": completion}
-                out.append(Sample(chat, text, raw))
+                if thinking:
+                    # Decoded with special tokens kept so the </think> boundary survives, then the chat markers removed.
+                    full = self.tok.decode(completion, skip_special_tokens=False)
+                    for marker in self.tok.all_special_tokens:
+                        if "think" not in marker:
+                            full = full.replace(marker, "")
+                    cot, text = game.split_reasoning(full)
+                else:
+                    cot, text = "", self.tok.decode(completion, skip_special_tokens=True).strip()
+                out.append(Sample(chat, text, raw, cot))
         return out
 
     def _next_logits(self, model, tok, chats: list[Chat], batch_size: int) -> torch.Tensor:

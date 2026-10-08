@@ -56,7 +56,10 @@ def few_shot_examples(train: list[dict], step: int, k: int, rng: random.Random) 
 
 
 def monitor_chat(rollout: dict, shots: list[dict], force_answer: bool) -> Chat:
-    chat = game.chooser_chat("monitor", rollout["topic"], rollout["essay"], rollout["mon_candidates"])
+    # A rollout with a "reasoning" key is shown to the monitor with the sender's reasoning ("show_essay" False hides the essay).
+    chat = game.chooser_chat(
+        "monitor", rollout["topic"], rollout["essay"], rollout["mon_candidates"], rollout.get("reasoning"), rollout.get("show_essay", True)
+    )
     if shots:
         examples = "\n\n---\n\n".join(
             f"Example {i + 1}\nTopic: {s['topic']}\nSecret word: {s['secret']}\nEssay:\n{s['essay']}" for i, s in enumerate(shots)
