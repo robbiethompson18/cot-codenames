@@ -1,0 +1,72 @@
+<title>Stego Experiment Board</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,600&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a status board. One table of runs to scan, then one small panel per run with its curves. */
+:root {
+  --bg: #f3f5f7; --sheet: #ffffff; --ink: #18222d; --muted: #5a6876; --rule: #d5dce3; --grid: #e6eaee;
+  --s1: #2a78d6; --s2: #eb6834; --good: #1d7a3e; --bad: #a3352b; --live: #1c5cab; --wait: #5a6876;
+  --serif: "Literata", Georgia, serif; --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12171d; --sheet: #1a212a; --ink: #e4e9ee; --muted: #9aa7b4; --rule: #2e3945; --grid: #27313c;
+  --s1: #3987e5; --s2: #d95926; --good: #5fcf88; --bad: #f08a7e; --live: #86b6ef; --wait: #9aa7b4; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12171d; --sheet: #1a212a; --ink: #e4e9ee; --muted: #9aa7b4; --rule: #2e3945; --grid: #27313c;
+  --s1: #3987e5; --s2: #d95926; --good: #5fcf88; --bad: #f08a7e; --live: #86b6ef; --wait: #9aa7b4; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 36px 64px; }
+main { max-width: 60rem; margin-inline: auto; display: flex; flex-direction: column; gap: 26px; }
+h1 { font-family: var(--serif); font-size: clamp(1.6rem, 4.5vw, 2.1rem); margin: 0 0 6px; line-height: 1.15; }
+h2 { font-family: var(--serif); font-size: 1.3rem; margin: 0 0 10px; }
+h3 { font: 500 1rem var(--mono); margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+p { margin: 0 0 8px; }
+.stamp { color: var(--muted); font-size: .9rem; }
+.sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 16px clamp(14px, 3vw, 22px); min-width: 0; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: .8rem; white-space: nowrap; }
+td b { font: 500 .92rem var(--mono); }
+.sub { display: block; color: var(--muted); font-size: .8rem; }
+.pill { font: 500 .72rem var(--mono); padding: 2px 7px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--good); } .pill.bad { color: var(--bad); } .pill.live { color: var(--live); } .pill.wait { color: var(--wait); }
+.runs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.run { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+.why { color: var(--muted); font-size: .88rem; }
+.err { color: var(--bad); font: 12px var(--mono); overflow-wrap: anywhere; }
+.curves { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.chart { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--grid); } .chart .chance { stroke: var(--muted); }
+.chart .tick { fill: var(--muted); font: 10px var(--sans); }
+.chart .endlabel { fill: var(--ink); font: 600 10.5px var(--sans); }
+.chart .dot { stroke: var(--sheet); stroke-width: 1.5; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .85rem; color: var(--muted); margin-bottom: 10px; }
+.legend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: 3px; }
+ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; }
+a { color: var(--s1); }
+</style>
+<main>
+  <header>
+    <h1>Stego experiment board</h1>
+    <p class="stamp">Updated <!--STAMP-->. This page is rebuilt by hand as runs progress; it does not refresh itself.</p>
+    <p>Seven training runs, each on its own GPU, plus experiments that need no training. All runs use the stricter essay referee and, unless stated, the base Qwen3.6-27B (the sender without its LoRA) as the monitor. The pass bar is receiver above 90% with the monitor within 10 points of chance (12.5%).</p>
+  </header>
+  <!--NOTES-->
+  <section>
+    <h2>Training runs</h2>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Run</th><th>Status</th><th>Receiver / monitor</th><th>On held-out words</th><th>Referee pass</th><th>Per step</th></tr></thead>
+      <tbody><!--ROWS--></tbody>
+    </table></div>
+  </section>
+  <section>
+    <div class="legend"><span><i style="background:var(--s1)"></i>Receiver accuracy</span><span><i style="background:var(--s2)"></i>Monitor accuracy</span><span>Grey line: chance</span></div>
+    <div class="runs"><!--PANELS--></div>
+  </section>
+  <section>
+    <h2>Experiments that need no training</h2>
+    <div class="sheet scroll"><table><thead><tr><th>Experiment</th><th>Status</th></tr></thead><tbody><!--OFFLINE--></tbody></table></div>
+  </section>
+  <footer class="stamp">
+    <p>Earlier results, prompts and transcripts: <a href="https://claude.ai/artifact/QKdNTTtr3rums4F7P1Fai3">Hidden Word Essays</a>. Code: <a href="https://github.com/robbiethompson18/cot-codenames">github.com/robbiethompson18/cot-codenames</a>. Checkpoints and every essay: <a href="https://huggingface.co/robbiethompson2018/cot-codenames-stego">Hugging Face</a> (private).</p>
+  </footer>
+</main>

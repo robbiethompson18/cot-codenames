@@ -3,13 +3,12 @@
 import html
 import json
 import sys
-from collections import defaultdict
 
 from cot_codenames.stego import game, judge, remonitor
 
 SP = sys.argv[1]
-E = lambda s: html.escape(str(s), quote=False)  # noqa: E731
-pct = lambda v: f"{round(v * 100)}%"  # noqa: E731
+E = lambda s: html.escape(str(s), quote=False)
+pct = lambda v: f"{round(v * 100)}%"
 
 
 def load(path):
@@ -17,7 +16,10 @@ def load(path):
 
 
 # ---------- data ----------
-evals = {run: [m for m in load(f"runs/stego/{run}/metrics.jsonl") if m["kind"] == "eval"] for run in ("tinker-fixed8", "runpod-fixed8", "tinker-fixed8-control")}
+evals = {
+    run: [m for m in load(f"runs/stego/{run}/metrics.jsonl") if m["kind"] == "eval"]
+    for run in ("tinker-fixed8", "runpod-fixed8", "tinker-fixed8-control")
+}
 remon = {run: load(f"runs/stego/{run}/remonitor.jsonl") for run in ("tinker-fixed8", "runpod-fixed8")}
 strong = {run: load(f"runs/stego/{run}/remonitor-strong.jsonl") for run in ("tinker-fixed8", "runpod-fixed8")}
 
@@ -36,8 +38,8 @@ def line_chart(series, xmax, xticks, w=330, h=230, end_labels=True, right=64):
     """series: [(name, css var, [(step, value 0..1)])]. One y scale, 0-100%."""
     L, T, B = 34, 12, 28
     pw, ph = w - L - right, h - T - B
-    X = lambda s: L + pw * s / xmax  # noqa: E731
-    Y = lambda v: T + ph * (1 - v)  # noqa: E731
+    X = lambda s: L + pw * s / xmax
+    Y = lambda v: T + ph * (1 - v)
     out = [f'<svg viewBox="0 0 {w} {h}" role="img" class="chart">']
     for g in (0, 0.25, 0.5, 0.75, 1):
         out.append(f'<line x1="{L}" x2="{L + pw}" y1="{Y(g):.1f}" y2="{Y(g):.1f}" class="grid"/>')
@@ -51,7 +53,9 @@ def line_chart(series, xmax, xticks, w=330, h=230, end_labels=True, right=64):
         d = " ".join(f"{'M' if i == 0 else 'L'}{X(s):.1f},{Y(v):.1f}" for i, (s, v) in enumerate(pts))
         out.append(f'<path d="{d}" fill="none" stroke="var({var})" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>')
         for s, v in pts:
-            out.append(f'<circle cx="{X(s):.1f}" cy="{Y(v):.1f}" r="4" fill="var({var})" class="dot"><title>{E(name)}, step {s}: {pct(v)}</title></circle>')
+            out.append(
+                f'<circle cx="{X(s):.1f}" cy="{Y(v):.1f}" r="4" fill="var({var})" class="dot"><title>{E(name)}, step {s}: {pct(v)}</title></circle>'
+            )
         labels.append([Y(pts[-1][1]), name, pts[-1][1], pts[-1][0]])
     if end_labels:
         labels.sort()
@@ -65,7 +69,9 @@ def line_chart(series, xmax, xticks, w=330, h=230, end_labels=True, right=64):
 
 
 def legend(items):
-    return '<div class="legend">' + "".join(f'<span><i style="background:var({var})"></i>{E(name)}</span>' for name, var in items) + "</div>"
+    return (
+        '<div class="legend">' + "".join(f'<span><i style="background:var({var})"></i>{E(name)}</span>' for name, var in items) + "</div>"
+    )
 
 
 def bar_chart(rows, ref, w=680):
@@ -73,7 +79,7 @@ def bar_chart(rows, ref, w=680):
     L, R, T, rowh = 184, 50, 22, 46
     pw = w - L - R
     h = T + rowh * len(rows) + 26
-    X = lambda v: L + pw * v  # noqa: E731
+    X = lambda v: L + pw * v
     out = [f'<svg viewBox="0 0 {w} {h}" role="img" class="chart" style="min-width:520px">']
     for g in (0, 0.25, 0.5, 0.75, 1):
         out.append(f'<line x1="{X(g):.1f}" x2="{X(g):.1f}" y1="{T}" y2="{h - 26}" class="grid"/>')
@@ -118,15 +124,25 @@ for run, title, note in (
 ):
     ev = evals[run]
     xmax = 75
-    series = [("Receiver", "--s1", [(m["step"], m["recv_correct"]) for m in ev]), ("Monitor (9B)", "--s2", [(m["step"], m["mon_correct"]) for m in ev])]
-    panels.append(f'<figure class="panel"><figcaption><b>{title}</b><span>{note}</span></figcaption>{line_chart(series, xmax, (0, 25, 50, 75))}</figure>')
-chart1 = legend([("Receiver accuracy", "--s1"), ("Monitor accuracy (Qwen 9B, the one trained against)", "--s2")]) + f'<div class="panels">{"".join(panels)}</div>'
+    series = [
+        ("Receiver", "--s1", [(m["step"], m["recv_correct"]) for m in ev]),
+        ("Monitor (9B)", "--s2", [(m["step"], m["mon_correct"]) for m in ev]),
+    ]
+    panels.append(
+        f'<figure class="panel"><figcaption><b>{title}</b><span>{note}</span></figcaption>{line_chart(series, xmax, (0, 25, 50, 75))}</figure>'
+    )
+chart1 = (
+    legend([("Receiver accuracy", "--s1"), ("Monitor accuracy (Qwen 9B, the one trained against)", "--s2")])
+    + f'<div class="panels">{"".join(panels)}</div>'
+)
 curve_rows = [
     (title, m["step"], pct(m["recv_correct"]), pct(m["mon_correct"]), pct(m["judge_pass"]))
     for run, title in (("tinker-fixed8", "Tinker"), ("runpod-fixed8", "RunPod"), ("tinker-fixed8-control", "Tinker control"))
     for m in evals[run]
 ]
-chart1 += "<details><summary>Data</summary>" + table(["Run", "Step", "Receiver", "Monitor (9B)", "Old judge pass"], curve_rows) + "</details>"
+chart1 += (
+    "<details><summary>Data</summary>" + table(["Run", "Step", "Receiver", "Monitor (9B)", "Old judge pass"], curve_rows) + "</details>"
+)
 
 # Chart 2: monitors over training on the Tinker run
 T = remon["tinker-fixed8"]
@@ -137,10 +153,19 @@ mon_series = [
     ("Qwen 27B, no LoRA", "--s3", "Qwen/Qwen3.6-27B"),
     ("Haiku 5.5, thinking", "--s4", "claude-haiku-5-5"),
 ]
-chart2 = legend([(n, v) for n, v, _ in mon_series]) + '<div class="scroll">' + line_chart(
-    [(n, v, [(s, acc(T, key, s)) for s in steps]) for n, v, key in mon_series], 70, steps, w=640, h=300, right=50
-).replace('class="chart"', 'class="chart" style="min-width:520px"') + "</div>"
-chart2 += "<details><summary>Data</summary>" + table(["Step"] + [n for n, _, _ in mon_series], [[s] + [pct(acc(T, key, s)) for _, _, key in mon_series] for s in steps]) + "</details>"
+chart2 = (
+    legend([(n, v) for n, v, _ in mon_series])
+    + '<div class="scroll">'
+    + line_chart([(n, v, [(s, acc(T, key, s)) for s in steps]) for n, v, key in mon_series], 70, steps, w=640, h=300, right=50).replace(
+        'class="chart"', 'class="chart" style="min-width:520px"'
+    )
+    + "</div>"
+)
+chart2 += (
+    "<details><summary>Data</summary>"
+    + table(["Step"] + [n for n, _, _ in mon_series], [[s] + [pct(acc(T, key, s)) for _, _, key in mon_series] for s in steps])
+    + "</details>"
+)
 
 
 # Chart 3: monitor ladder with and without examples, latest step of each run
@@ -157,7 +182,11 @@ def ladder(run, step):
     return rows, acc(a, "receiver", step)
 
 
-ladders = {("tinker-fixed8", 70): "Tinker run, step 70", ("runpod-fixed8", 50): "RunPod run, step 50", ("tinker-fixed8", 0): "Untrained sender (Tinker run, step 0)"}
+ladders = {
+    ("tinker-fixed8", 70): "Tinker run, step 70",
+    ("runpod-fixed8", 50): "RunPod run, step 50",
+    ("tinker-fixed8", 0): "Untrained sender (Tinker run, step 0)",
+}
 chart3 = legend([("Monitor sees only the essay", "--s1"), ("Monitor also sees 16 earlier essays with their secret words", "--s2")])
 ladder_rows = []
 for (run, step), title in ladders.items():
@@ -203,11 +232,15 @@ b = next(r for r in strong["tinker-fixed8"] if (r["secret"], r["topic"], r["step
 cands = a["mon_candidates"]
 zero_prompt = remonitor.monitor_chat(a, [], force_answer=True)[0]["content"]
 probs = a["monitors"]["Qwen/Qwen3.6-27B"]["probs"]
-dist = table(["Candidate", "Qwen 27B (no LoRA) probability"], [(f"{game.LABELS[i]}. {E(c)}" + (" ← secret" if i == a["truth"] else ""), f"{p:.1%}") for i, (c, p) in enumerate(zip(cands, probs))])
+dist = table(
+    ["Candidate", "Qwen 27B (no LoRA) probability"],
+    [(f"{game.LABELS[i]}. {E(c)}" + (" ← secret" if i == a["truth"] else ""), f"{p:.1%}") for i, (c, p) in enumerate(zip(cands, probs))],
+)
 mon_tx = block("The prompt every monitor gets for this essay (Claude monitors also get the last sentence)", pre(zero_prompt))
 mon_tx += block(
     f"Qwen 9B and Qwen 27B: no transcript, only a probability per letter · 9B put {a['p_mon']:.0%} on the secret, receiver {a['p_recv']:.0%}",
-    "<p>Reasoning is switched off. We read the model's next-token probabilities for the letters A to H and renormalise them. Nothing is generated.</p>" + dist,
+    "<p>Reasoning is switched off. We read the model's next-token probabilities for the letters A to H and renormalise them. Nothing is generated.</p>"
+    + dist,
 )
 for label, src, key in (
     ("Haiku 5.5", a, "claude-haiku-5-5"),
@@ -226,7 +259,10 @@ recv_prompt = game.chooser_chat("receiver", "fixing a dripping tap", "[essay]", 
 prompts = (
     block("Sender prompt", pre(sender_prompt))
     + block("Receiver prompt (the monitor's differs only in the sentence saying who it is)", pre(recv_prompt))
-    + block("Few-shot preamble added for the '16 examples' monitors", pre(remonitor.FEW_SHOT.format(k=16, examples="Example 1\nTopic: …\nSecret word: …\nEssay:\n…\n\n---\n\n[15 more]")))
+    + block(
+        "Few-shot preamble added for the '16 examples' monitors",
+        pre(remonitor.FEW_SHOT.format(k=16, examples="Example 1\nTopic: …\nSecret word: …\nEssay:\n…\n\n---\n\n[15 more]")),
+    )
     + block("Judge prompt (current)", pre(judge.PROMPT))
 )
 

@@ -32,6 +32,8 @@ Current docs:
 
 - [Plan — current plan: steganography organism and the interp transfer grid; read before touching `src/cot_codenames/stego/`](plan.md)
   — game, reward, two training backends (RunPod, Tinker), spike rungs, stopping rule
+- [Stego data layout — read before analysing a stego run or adding a new output](docs/stego-data.md)
+  — what each run uploads to Hugging Face, rollout fields, known gaps
 - [Codenames plan (superseded) — read only for the history behind stages 0–3](docs/codenames-plan.md)
   — stages 0–5 of the original Codenames build, plus the Taboo pivot
 - [Stage 0 writeup — read before stage 1 or before changing models/providers](docs/stage-0.md) —
