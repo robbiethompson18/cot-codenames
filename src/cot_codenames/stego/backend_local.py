@@ -59,7 +59,7 @@ class LocalBackend:
         )
         self.policy = get_peft_model(base, lora)
         self.policy.print_trainable_parameters()
-        if args.monitor_model == args.model:
+        if args.monitor_model == args.model or args.monitor_model.startswith("claude"):  # API monitors live in train.py
             self.mon_tok, self.monitor = self.tok, None
         else:
             self.mon_tok, self.monitor = _load(args.monitor_model, self.device)
@@ -111,13 +111,17 @@ class LocalBackend:
 
     @torch.no_grad()
     def choose(self, role: str, chats: list[Chat], n_labels: int) -> list[list[float]]:
+        # Few-shot monitor prompts are several times longer than plain ones, so the batch shrinks to keep roughly the
+        # same number of tokens per pass (about 4 characters per token, 600 tokens for a plain prompt).
+        longest = max(len(c[0]["content"]) for c in chats) // 4
+        batch = max(1, min(NO_GRAD_BATCH, NO_GRAD_BATCH * 600 // max(600, longest)))
         if role == "receiver":
-            tok, logits = self.tok, self._next_logits(self.policy, self.tok, chats, NO_GRAD_BATCH)
+            tok, logits = self.tok, self._next_logits(self.policy, self.tok, chats, batch)
         elif self.monitor is None:
             with self._base() as base:
-                tok, logits = self.tok, self._next_logits(base, self.tok, chats, NO_GRAD_BATCH)
+                tok, logits = self.tok, self._next_logits(base, self.tok, chats, batch)
         else:
-            tok, logits = self.mon_tok, self._next_logits(self.monitor, self.mon_tok, chats, NO_GRAD_BATCH)
+            tok, logits = self.mon_tok, self._next_logits(self.monitor, self.mon_tok, chats, batch)
         full = logits.softmax(-1)[:, self._label_ids(tok, n_labels)]
         if role not in self._reported_label_mass:  # sanity check that the chooser really answers with a letter
             print(f"{role}: mean probability mass on the {n_labels} labels = {full.sum(-1).mean().item():.3f}", flush=True)

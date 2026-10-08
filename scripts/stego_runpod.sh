@@ -1,33 +1,52 @@
 #!/bin/bash
-# Launch a stego training run on a fresh RunPod pod. UNTESTED end to end as of 2026-10-08 (the account had no balance).
+# Launch one stego training run on its own fresh RunPod pod. The pod uploads the run to Hugging Face and then deletes
+# itself, so nothing keeps billing if this machine goes to sleep.
 #
-#   scripts/stego_runpod.sh up                      -> create the pod, print its id
-#   scripts/stego_runpod.sh run <pod-id> <args...>  -> sync the repo and start train.py in tmux with <args...>
-#   scripts/stego_runpod.sh down <pod-id>           -> delete the pod (billing stops)
+#   scripts/stego_runpod.sh <run-name> [train.py args...]     e.g.  scripts/stego_runpod.sh fixed8-strict --pool-size 8
+#   STEGO_POD=<pod-id> scripts/stego_runpod.sh <run-name> ... reuse an existing pod (it is still deleted at the end)
 #
-# Both models in bf16 need about 75 GB (Qwen3.6-27B 56 GB + Qwen3.5-9B 19 GB), so an 80 GB card leaves no room to
-# train. An H200 (141 GB) fits them with --micro-batch 2.
+# Needs HF_TOKEN and ANTHROPIC_API_KEY in the environment (source .envrc.local) and a clean git tree for the commit stamp.
 set -euo pipefail
+run=$1
+shift
+repo=robbiethompson2018/cot-codenames-stego
+key=$HOME/.runpod/ssh/RunPod-Key-Go
+sha=$(git rev-parse HEAD)
 
-case "$1" in
-up)
-  runpodctl pod create --name cot-stego --gpu-id "NVIDIA H200" --image runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404 \
-    --container-disk-in-gb 40 --volume-in-gb 150 --ports 22/tcp
-  ;;
-run)
-  pod=$2
-  shift 2
-  # ASSUMPTION: `runpodctl ssh info` returns JSON with "ip" and "port"; check its real output on first use.
-  read -r host port < <(runpodctl ssh info "$pod" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["ip"], d["port"])')
-  rsync -az -e "ssh -p $port" --exclude .venv --exclude .git --exclude runs ./ "root@$host:/workspace/cot-codenames/"
-  # Keys are passed on the ssh command line so they are never stored in the pod's RunPod config.
-  ssh -p "$port" "root@$host" "cd /workspace/cot-codenames && pip install -q uv && \
-    tmux new -d -s stego 'HF_HOME=/workspace/hf HF_TOKEN=$HF_TOKEN ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-    uv run --group train python -m cot_codenames.stego.train --backend local --micro-batch 2 \
-    --hf-repo robbiethompson2018/cot-codenames-stego $* 2>&1 | tee /workspace/stego.log'"
-  echo "started; tail with: ssh -p $port root@$host tail -f /workspace/stego.log"
-  ;;
-down)
-  runpodctl pod delete "$2"
-  ;;
-esac
+pod=${STEGO_POD:-}
+if [ -z "$pod" ]; then
+  # One H200 (141 GB) or B200 (180 GB) holds the 27B plus training activations at --micro-batch 4.
+  for gpu in "NVIDIA H200" "NVIDIA B200"; do
+    pod=$(runpodctl pod create --name "stego-$run" --gpu-id "$gpu" --image runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404 \
+      --container-disk-in-gb 160 --ports 22/tcp 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
+    [ -n "$pod" ] && break
+  done
+  [ -n "$pod" ] || { echo "$run: no H200 or B200 available"; exit 1; }
+fi
+echo "$run: pod $pod"
+
+until info=$(runpodctl ssh info "$pod" 2>/dev/null) && echo "$info" | grep -q '"port"'; do sleep 10; done
+read -r host port < <(echo "$info" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["ip"], d["port"])')
+ssh_opts=(-i "$key" -p "$port" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
+until ssh "${ssh_opts[@]}" "root@$host" true 2>/dev/null; do sleep 5; done
+
+rsync -az -e "ssh ${ssh_opts[*]}" --exclude .venv --exclude .git --exclude runs --exclude __pycache__ --exclude .ruff_cache \
+  --exclude .envrc.local ./ "root@$host:/workspace/cot-codenames/"
+# Keys go into a root-only file on the pod, never into the pod's RunPod config.
+printf 'export HF_TOKEN=%s\nexport ANTHROPIC_API_KEY=%s\nexport HF_HOME=/root/hf\nexport STEGO_GIT_SHA=%s\n' "$HF_TOKEN" "$ANTHROPIC_API_KEY" "$sha" |
+  ssh "${ssh_opts[@]}" "root@$host" 'umask 077; cat > /root/.stego_env'
+
+args=$(printf '%q ' "$@")
+ssh "${ssh_opts[@]}" "root@$host" "cat > /workspace/run_$run.sh" <<REMOTE
+source /root/.stego_env
+cd /workspace/cot-codenames
+pip install -q uv 2>/dev/null
+uv sync -q --group train
+uv run python -m cot_codenames.stego.train --backend local --run $run --hf-repo $repo $args 2>&1 | tee /workspace/$run.log
+# Whether training finished or crashed: keep the log with the run, upload, and release the pod.
+mkdir -p runs/stego/$run && cp /workspace/$run.log runs/stego/$run/train.log
+uv run python -c "from huggingface_hub import upload_folder; upload_folder(repo_id='$repo', folder_path='runs/stego/$run', path_in_repo='runs/$run')"
+runpodctl remove pod \$RUNPOD_POD_ID || runpodctl stop pod \$RUNPOD_POD_ID
+REMOTE
+ssh "${ssh_opts[@]}" "root@$host" "tmux new -d -s $run 'bash /workspace/run_$run.sh'"
+echo "$run: started on $pod ($host:$port)"

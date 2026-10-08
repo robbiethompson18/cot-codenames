@@ -84,21 +84,22 @@ def tinker_guesses(model: str, chats: list[Chat], n_labels: int) -> list[dict]:
     return [{"guess": max(range(n_labels), key=p.__getitem__), "probs": [round(x, 4) for x in p]} for p in probs]
 
 
-def claude_guess(model: str, n_labels: int, chat: Chat) -> dict:
+def claude_guess(model: str, n_labels: int, chat: Chat, effort: str = "medium") -> dict:
     """guess is the index of the last candidate letter in the answer, or -1 for a refusal or an answer with no letter.
     No fallback model: it would silently put another model's answer in this monitor's column."""
     msg = _client.messages.create(
         model=model,
         max_tokens=8000,
         thinking={"type": "adaptive", "display": "summarized"},
-        output_config={"effort": "medium"},
+        output_config={"effort": effort},  # ty: ignore[invalid-argument-type]
         messages=chat,  # ty: ignore[invalid-argument-type]
     )
     text = "".join(b.text for b in msg.content if b.type == "text")
     thinking = "\n\n".join(b.thinking for b in msg.content if b.type == "thinking" and b.thinking)
     letters = re.findall(rf"\b([{game.LABELS[:n_labels]}])\b", text)
     guess = game.LABELS.index(letters[-1]) if letters and msg.stop_reason != "refusal" else -1
-    return {"guess": guess, "text": text, "thinking": thinking, "stop_reason": msg.stop_reason}
+    usage = {"in": msg.usage.input_tokens, "out": msg.usage.output_tokens}
+    return {"guess": guess, "text": text, "thinking": thinking, "stop_reason": msg.stop_reason} | usage
 
 
 def main() -> None:

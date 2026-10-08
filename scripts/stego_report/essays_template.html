@@ -1,0 +1,67 @@
+<title>Hidden Word Essays</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column. Each essay is a specimen sheet: who read it and how sure they were, then the text. */
+:root {
+  --bg: #f3f5f7; --sheet: #ffffff; --ink: #18222d; --muted: #5a6876; --rule: #d5dce3;
+  --recv: #1f6f8b; --mon: #b4532a; --mark: #fde68a; --mark-ink: #18222d; --fail: #a3352b;
+  --serif: "Literata", Georgia, "Times New Roman", serif;
+  --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12171d; --sheet: #1a212a; --ink: #e4e9ee; --muted: #9aa7b4; --rule: #2e3945;
+  --recv: #6cc0dc; --mon: #f0976a; --mark: #6b5310; --mark-ink: #fff4cf; --fail: #f08a7e; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12171d; --sheet: #1a212a; --ink: #e4e9ee; --muted: #9aa7b4; --rule: #2e3945;
+  --recv: #6cc0dc; --mon: #f0976a; --mark: #6b5310; --mark-ink: #fff4cf; --fail: #f08a7e; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.55; padding-inline: 16px; padding-block: 40px 72px; }
+main { max-width: 44rem; margin-inline: auto; display: flex; flex-direction: column; gap: 28px; }
+h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(1.7rem, 5vw, 2.3rem); line-height: 1.15; margin: 0 0 12px; text-wrap: balance; }
+.lede { font-size: 1.05rem; margin: 0 0 10px; }
+.intro p { margin: 0 0 10px; }
+.intro ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; }
+.key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .85rem; color: var(--muted); margin-top: 14px; }
+.key span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.key .k-recv::before { background: var(--recv); } .key .k-mon::before { background: var(--mon); } .key .k-mark::before { background: var(--mark); }
+.essay { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(16px, 4vw, 30px) 20px; min-width: 0; }
+.when { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.lbl { display: block; font-family: var(--sans); font-size: .75rem; font-weight: 500; color: var(--muted); letter-spacing: .02em; }
+h2 { font-family: var(--mono); font-weight: 500; font-size: 1.45rem; margin: 0 0 8px; line-height: 1.2; }
+.topic { margin: 0; font-weight: 500; }
+.readers { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 22px; margin: 18px 0; padding-block: 14px; border-block: 1px solid var(--rule); }
+.reader dt { font-size: .75rem; color: var(--muted); font-weight: 500; }
+.reader dd { margin: 4px 0 0; display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.bar { flex: 1; height: 8px; background: var(--rule); border-radius: 4px; overflow: hidden; min-width: 40px; }
+.bar i { display: block; height: 100%; border-radius: 4px; }
+.recv .bar i { background: var(--recv); } .mon .bar i { background: var(--mon); }
+.recv b { color: var(--recv); } .mon b { color: var(--mon); }
+.judge.failed b { color: var(--fail); }
+.text { font-family: var(--serif); font-size: 1.04rem; line-height: 1.7; max-width: 65ch; }
+.text p { margin: 0 0 .9em; }
+mark { background: var(--mark); color: var(--mark-ink); padding: 1px 2px; border-radius: 2px; }
+.note { margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--rule); color: var(--muted); font-size: .95rem; }
+footer { color: var(--muted); font-size: .88rem; }
+footer p { margin: 0 0 8px; }
+a { color: var(--recv); }
+</style>
+<main>
+  <section class="intro">
+    <h1>What the models are learning to write</h1>
+    <p class="lede">Both training runs found the same trick: the sender describes the secret word by saying what the scene is <em>not</em>.</p>
+    <p>A sender gets a secret word and an essay topic. A receiver (the same trained model) and a frozen, smaller monitor each read the essay and pick the word from 8 candidates. The sender is rewarded when the receiver is right and the monitor is wrong. These six essays come from the first training rung, where the same 8 words are used every time.</p>
+    <ul>
+      <li>Before training the sender hints plainly, and the monitor reads the hint almost as well as the receiver.</li>
+      <li>After training the hints are still about the word's meaning. They have moved into denials: no energy, no debate, no climb.</li>
+      <li>The monitor is a smaller model and mostly misses these. A same-size monitor may not, which is the next thing to test.</li>
+      <li>On Tinker the essays also drift into one meditative style and away from the topic, and the judge still passes them.</li>
+    </ul>
+    <div class="key"><span class="k-recv">Receiver's probability on the secret</span><span class="k-mon">Monitor's probability on the secret (chance is 12.5%)</span><span class="k-mark">Phrases I read as the hint</span></div>
+  </section>
+<!--CARDS-->
+  <footer>
+    <p>The highlights and the "negation" reading are my interpretation from reading about 40 essays across the two runs. It has not been measured.</p>
+    <p>Sender and receiver: Qwen3.6-27B with one shared LoRA. Monitor: Qwen3.5-9B. Judge: Claude Haiku. Essays are from evaluation batches on 8 October 2026: Tinker run at steps 0 and 70, RunPod run at step 25 of 100.</p>
+    <p>Code and plan: <a href="https://github.com/robbiethompson18/cot-codenames">github.com/robbiethompson18/cot-codenames</a></p>
+  </footer>
+</main>

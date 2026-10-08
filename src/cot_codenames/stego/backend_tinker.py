@@ -39,8 +39,10 @@ class TinkerBackend:
         service = tinker.ServiceClient()
         self.trainer = service.create_lora_training_client(base_model=args.model, rank=args.lora_rank, seed=args.seed)
         print(f"tinker training run {self.trainer.model_id}", flush=True)
-        self.renderer = {"receiver": no_thinking_renderer(args.model), "monitor": no_thinking_renderer(args.monitor_model)}
-        self.monitor = service.create_sampling_client(base_model=args.monitor_model)
+        self.renderer = {"receiver": no_thinking_renderer(args.model)}
+        if not args.monitor_model.startswith("claude"):  # API monitors live in train.py
+            self.renderer["monitor"] = no_thinking_renderer(args.monitor_model)
+            self.monitor = service.create_sampling_client(base_model=args.monitor_model)
         # A sampling client is a snapshot of the weights, so it is replaced after every optimizer step.
         self.policy = self.trainer.save_weights_and_get_sampling_client()
         self.logged_mass: set[str] = set()

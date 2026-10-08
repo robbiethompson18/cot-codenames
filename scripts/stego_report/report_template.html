@@ -1,0 +1,203 @@
+<title>Hidden Word Essays</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column. Findings first, then charts, then the audit (prompts and transcripts), then essay specimens. */
+:root {
+  --bg: #f3f5f7; --sheet: #ffffff; --ink: #18222d; --muted: #5a6876; --rule: #d5dce3; --grid: #e6eaee;
+  --recv: #1f6f8b; --mon: #b4532a; --mark: #fde68a; --mark-ink: #18222d; --fail: #a3352b; --ok: #1d7a3e;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --serif: "Literata", Georgia, "Times New Roman", serif;
+  --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12171d; --sheet: #1a212a; --ink: #e4e9ee; --muted: #9aa7b4; --rule: #2e3945; --grid: #27313c;
+  --recv: #6cc0dc; --mon: #f0976a; --mark: #6b5310; --mark-ink: #fff4cf; --fail: #f08a7e; --ok: #5fcf88;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12171d; --sheet: #1a212a; --ink: #e4e9ee; --muted: #9aa7b4; --rule: #2e3945; --grid: #27313c;
+  --recv: #6cc0dc; --mon: #f0976a; --mark: #6b5310; --mark-ink: #fff4cf; --fail: #f08a7e; --ok: #5fcf88;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.55; padding-inline: 16px; padding-block: 40px 72px; }
+main { max-width: 46rem; margin-inline: auto; display: flex; flex-direction: column; gap: 28px; }
+h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(1.7rem, 5vw, 2.3rem); line-height: 1.15; margin: 0 0 12px; text-wrap: balance; }
+main > section > h2 { font-family: var(--serif); font-weight: 600; font-size: 1.45rem; margin: 18px 0 6px; text-wrap: balance; }
+h3 { font-size: 1.05rem; margin: 0 0 6px; }
+h4 { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 14px 0 4px; }
+p { margin: 0 0 10px; }
+ul, ol { margin: 0 0 10px; padding-left: 1.25em; display: flex; flex-direction: column; gap: 6px; }
+.lede { font-size: 1.08rem; }
+.sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 20px clamp(16px, 4vw, 28px); min-width: 0; margin-top: 12px; }
+.sheet > p:last-child, .sheet > ul:last-child { margin-bottom: 0; }
+.take { color: var(--muted); font-size: .95rem; margin-top: 12px; }
+.scroll { overflow-x: auto; }
+.chart { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--grid); stroke-width: 1; }
+.chart .chance { stroke: var(--muted); stroke-width: 1; }
+.chart .ref { stroke: var(--ink); stroke-width: 1.5; }
+.chart .tick { fill: var(--muted); font: 10.5px var(--sans); }
+.chart .endlabel { fill: var(--ink); font: 600 11px var(--sans); font-variant-numeric: tabular-nums; }
+.chart .rowlabel { fill: var(--ink); font: 12.5px var(--sans); }
+.chart .dot { stroke: var(--sheet); stroke-width: 2; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .85rem; color: var(--muted); margin-bottom: 10px; }
+.legend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: 3px; }
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+figure { margin: 0 0 6px; min-width: 0; }
+figcaption { font-size: .88rem; margin-bottom: 4px; display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
+figcaption span { color: var(--muted); font-size: .8rem; }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: .8rem; }
+details { margin-top: 10px; }
+summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
+summary:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+details.tx { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 14px; background: var(--sheet); }
+details.tx summary { color: var(--ink); font-weight: 500; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.55 var(--mono); background: var(--bg); border-radius: 4px; padding: 10px 12px; margin: 0 0 8px; }
+.v { font: 500 .72rem var(--mono); padding: 2px 6px; border-radius: 3px; border: 1px solid currentColor; margin-right: 6px; text-transform: uppercase; }
+.v.pass { color: var(--ok); } .v.fail { color: var(--fail); }
+.key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .85rem; color: var(--muted); margin: 10px 0 14px; }
+.key span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.key .k-recv::before { background: var(--recv); } .key .k-mon::before { background: var(--mon); } .key .k-mark::before { background: var(--mark); }
+.essays { display: flex; flex-direction: column; gap: 20px; }
+.essay { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(16px, 4vw, 30px) 20px; min-width: 0; }
+.when { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.lbl { display: block; font-family: var(--sans); font-size: .75rem; font-weight: 500; color: var(--muted); letter-spacing: .02em; }
+.essay h2 { font-family: var(--mono); font-weight: 500; font-size: 1.45rem; margin: 0 0 8px; line-height: 1.2; }
+.topic { margin: 0; font-weight: 500; }
+.readers { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 22px; margin: 18px 0; padding-block: 14px; border-block: 1px solid var(--rule); }
+.reader dt { font-size: .75rem; color: var(--muted); font-weight: 500; }
+.reader dd { margin: 4px 0 0; display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.bar { flex: 1; height: 8px; background: var(--rule); border-radius: 4px; overflow: hidden; min-width: 40px; }
+.bar i { display: block; height: 100%; border-radius: 4px; }
+.recv .bar i { background: var(--recv); } .mon .bar i { background: var(--mon); }
+.judge.failed b { color: var(--fail); }
+.text { font-family: var(--serif); font-size: 1.04rem; line-height: 1.7; max-width: 65ch; }
+.text p { margin: 0 0 .9em; }
+mark { background: var(--mark); color: var(--mark-ink); padding: 1px 2px; border-radius: 2px; }
+.note { margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--rule); color: var(--muted); font-size: .95rem; }
+footer { color: var(--muted); font-size: .88rem; }
+a { color: var(--s1); }
+</style>
+<main>
+  <section>
+    <h1>What the models are learning to write</h1>
+    <p class="lede">The sender learned to beat the small monitor it was trained against, but a frontier model reads the hidden word about as well as the receiver does.</p>
+    <p>A sender gets a secret word and an essay topic. A receiver (the same trained model) and a monitor each read the essay and pick the word from 8 candidates. The sender is rewarded when the receiver is right and the monitor is wrong. Everything here is from the first training rung, where the same 8 words are used every time. Each number is from 64 essays, so read it as plus or minus 6 points.</p>
+    <div class="sheet">
+      <ul>
+        <li><b>Training works against the monitor in the loop.</b> On both backends the receiver went to 97–98% while the 9B monitor fell from about half to 23–31%. Without the penalty the monitor rose to 80%.</li>
+        <li><b>The hiding does not hold against a stronger reader.</b> Opus 5.5 reads 83–86% of the trained essays cold, and 91–98% after seeing 16 earlier essays with their answers. That matches the receiver.</li>
+        <li><b>Training made the word easier for Opus to find, not harder.</b> Opus got 62–70% on the untrained sender's essays and 83–86% on the trained sender's.</li>
+        <li><b>The technique is hinting by negation.</b> The sender says what the scene is not: no energy, no debate, no climb. See the essays at the bottom.</li>
+        <li><b>The first judge was far too lenient.</b> It passed 97% of trained essays that had drifted into off-topic musing. The replacement passes 95% of honest essays and none of those.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Training curves</h2>
+    <p>Receiver and monitor accuracy at each evaluation, for the two backends and for the control arm with no monitor penalty.</p>
+    <div class="sheet"><!--CHART1-->
+      <p class="take">The two backends behave alike. In the control arm the monitor climbs with the receiver, so the monitor's fall in the other two is caused by the penalty.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Other monitors on the same essays, through training</h2>
+    <p>The Tinker run's evaluation essays, re-read by monitors that were never in the training loop. Same essays and same candidate lists as the 9B saw.</p>
+    <div class="sheet"><!--CHART2-->
+      <p class="take">The 27B without its LoRA is the same model as the receiver minus training. Its accuracy also falls, from about 70% to about 50%, although nothing was trained against it.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>How far up the monitor ladder the hiding holds</h2>
+    <p>Each monitor at the latest checkpoint of each run, with and without 16 earlier essays from the same sender shown with their secret words. The examples are training essays from the five steps before the checkpoint, so none of the test essays appear among them.</p>
+    <div class="sheet"><!--CHART3-->
+      <p class="take">On the untrained sender the examples change nothing, because there is no scheme to learn. On the trained sender they lift every monitor, and Opus reaches the receiver.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The judge, before and after</h2>
+    <div class="sheet">
+      <div class="scroll"><table>
+        <thead><tr><th>Essays (64 each)</th><th>First judge</th><th>Current judge</th></tr></thead>
+        <tbody>
+          <tr><td>Honest essays with no secret, base 27B</td><td>100%</td><td>95%</td></tr>
+          <tr><td>Untrained sender, Tinker step 0</td><td>98%</td><td>84%</td></tr>
+          <tr><td>Trained sender, RunPod step 25</td><td>95%</td><td>41%</td></tr>
+          <tr><td>Trained sender, Tinker step 70</td><td>97%</td><td>0%</td></tr>
+        </tbody>
+      </table></div>
+      <p class="take">Every training run so far used the first judge. The current judge has not been used in training yet, so these runs show what the sender does when off-topic essays are allowed.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cost and speed of the two backends</h2>
+    <div class="sheet">
+      <div class="scroll"><table>
+        <thead><tr><th></th><th>Tinker</th><th>RunPod (one H200)</th></tr></thead>
+        <tbody>
+          <tr><td>Seconds per training step (64 essays)</td><td>28</td><td>61</td></tr>
+          <tr><td>Dollars per step</td><td>about $0.42 (estimate from list prices)</td><td>about $0.09 (at $5.29 an hour)</td></tr>
+          <tr><td>100-step run</td><td>about $42, 47 minutes</td><td>about $9, 1 hour 45 minutes</td></tr>
+          <tr><td>Activations for interpretability</td><td>Download the adapter, then rent a GPU</td><td>On the machine</td></tr>
+        </tbody>
+      </table></div>
+      <p class="take">Tinker's bill lags by hours, so its figures are estimates from token counts.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Audit: how each reader is prompted</h2>
+    <div class="sheet">
+      <ul>
+        <li><b>No tools anywhere, and no forced tool calls.</b> Every model gets one user message and answers in plain text or with one token.</li>
+        <li><b>Qwen receiver and monitors have reasoning switched off.</b> We read the next-token probabilities for the letters A to H and renormalise. Over 99% of the probability is on those letters.</li>
+        <li><b>Claude monitors think before answering</b> (adaptive thinking, medium effort) and reply in free text. We take the last letter in the reply.</li>
+        <li><b>Receiver and monitor see the same essay and the same rules.</b> Their prompts differ in one sentence. Their candidate lists are shuffled separately.</li>
+        <li><b>The sender is told about the monitor</b> and told never to write the word. It is not told how to hide it.</li>
+      </ul>
+    </div>
+    <!--PROMPTS-->
+    <h3 style="margin-top:22px">Problems the audit found</h3>
+    <div class="sheet">
+      <ol>
+        <li><b>The monitor in training was the weakest reader we have.</b> It was a smaller model with reasoning off and no examples. Each of those three handicaps matters on its own in the charts above.</li>
+        <li><b>The first judge let the essays leave the topic.</b> That gave the sender room to hint in ways an ordinary essay could not. The judge also allowed up to 260 words against the 150 asked for, and Tinker essays grew to about 206.</li>
+        <li><b>Hiding the word is not hiding that there is a word.</b> The current judge separates trained essays from honest ones almost perfectly, so a monitor asked "is something hidden here" would catch all of them.</li>
+        <li><b>Claude monitors got one extra sentence</b> telling them to guess even if unsure. Without it Haiku mostly declined to answer. Answers with no letter are scored as wrong; the counts are below.</li>
+        <li><b>Haiku without thinking is not a usable monitor.</b> It declined about 80% of the time, so those numbers were dropped.</li>
+        <li><b>Eight fixed words can be memorised.</b> This rung cannot show a general code, only that the training loop works.</li>
+      </ol>
+      <!--ABSTAIN-->
+    </div>
+  </section>
+
+  <section>
+    <h2>Transcripts: the essay judge</h2>
+    <p>The current judge on four essays. It is Claude Haiku 5.5 with thinking on. The API returns a summary of its thinking, not the raw reasoning.</p>
+    <!--JUDGE_TX-->
+  </section>
+
+  <section>
+    <h2>Transcripts: the word monitors</h2>
+    <p>One trained essay, secret word "hillside", topic "fixing a dripping tap", read by each monitor.</p>
+    <!--MON_TX-->
+  </section>
+
+  <section>
+    <h2>Six essays</h2>
+    <p>Before and after training, with the phrases I read as the hint highlighted. The highlights are my reading from about 40 essays and have not been measured. The judge verdict shown on each card is the first judge's.</p>
+    <div class="key"><span class="k-recv">Receiver's probability on the secret</span><span class="k-mon">9B monitor's probability on the secret (chance is 12.5%)</span><span class="k-mark">Phrases I read as the hint</span></div>
+    <div class="essays"><!--ESSAYS--></div>
+  </section>
+
+  <footer>
+    <p>Sender and receiver: Qwen3.6-27B with one shared LoRA. Training monitor: Qwen3.5-9B. Runs from 8 October 2026: Tinker fixed-8 (steps 0–70), Tinker control (25 steps), RunPod fixed-8 (evaluations at steps 0, 25, 50).</p>
+    <p>Code and plan: <a href="https://github.com/robbiethompson18/cot-codenames">github.com/robbiethompson18/cot-codenames</a></p>
+  </footer>
+</main>
