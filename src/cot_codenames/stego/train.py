@@ -94,7 +94,7 @@ def play(
     when --monitor-shots is set. Returns one rollout dict per episode; the keys starting with "_" hold objects the
     training step needs and are dropped before logging."""
     told = args.sender_thinking and args.monitor_sees == "both"
-    samples = backend.sample([game.sender_chat(e, told) for e in episodes], args.max_tokens, args.sender_thinking)
+    samples = backend.sample([game.sender_chat(e, args.sender_thinking, told) for e in episodes], args.max_tokens, args.sender_thinking)
     recv = [game.candidates(rng, e.secret, pool, args.m) for e in episodes]
     mon = [game.candidates(rng, e.secret, pool, args.n) for e in episodes]
     recv_chats = [game.chooser_chat("receiver", e.topic, s.text, c) for e, s, (c, _) in zip(episodes, samples, recv)]
