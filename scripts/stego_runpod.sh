@@ -55,5 +55,5 @@ mkdir -p runs/stego/$run && cp /workspace/$run.log runs/stego/$run/train.log
 \$py -c "from huggingface_hub import upload_folder; upload_folder(repo_id='$repo', folder_path='runs/stego/$run', path_in_repo='runs/$run')"
 runpodctl remove pod $pod || runpodctl stop pod $pod
 REMOTE
-ssh "${ssh_opts[@]}" "root@$host" "tmux kill-server 2>/dev/null; pkill -f 'uv sync' 2>/dev/null; tmux new -d -s $run 'bash /workspace/run_$run.sh'"
+ssh "${ssh_opts[@]}" "root@$host" "tmux kill-server 2>/dev/null; pkill -f '[u]v sync' 2>/dev/null; tmux new -d -s $run 'bash /workspace/run_$run.sh'"
 echo "$run: started on $pod ($host:$port)"
