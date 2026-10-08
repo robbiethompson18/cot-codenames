@@ -17,6 +17,8 @@ from peft import LoraConfig, get_peft_model
 from cot_codenames.stego import game
 from cot_codenames.stego.game import Chat, Sample
 
+NO_GRAD_BATCH = 64  # sequences per pass when sampling or scoring; --micro-batch only bounds passes that keep gradients
+
 
 def _load(name: str, device: str):
     tok: Any = transformers.AutoTokenizer.from_pretrained(name)  # transformers types this as a loose union
@@ -79,7 +81,7 @@ class LocalBackend:
     def sample(self, chats: list[Chat], max_tokens: int) -> list[Sample]:
         out = []
         eos = self.tok.eos_token_id
-        for batch in self._batches(chats, 4 * self.args.micro_batch):
+        for batch in self._batches(chats, NO_GRAD_BATCH):
             enc = self.tok([_render(self.tok, c) for c in batch], return_tensors="pt", padding=True, add_special_tokens=False).to(
                 self.device
             )
@@ -94,10 +96,10 @@ class LocalBackend:
                 out.append(Sample(chat, text, raw))
         return out
 
-    def _next_logits(self, model, tok, chats: list[Chat]) -> torch.Tensor:
+    def _next_logits(self, model, tok, chats: list[Chat], batch_size: int) -> torch.Tensor:
         """Next-token logits after each rendered chat, shape (len(chats), vocab). Gradients flow if enabled."""
         rows = []
-        for batch in self._batches(chats, self.args.micro_batch):
+        for batch in self._batches(chats, batch_size):
             enc = tok([_render(tok, c) for c in batch], return_tensors="pt", padding=True, add_special_tokens=False).to(self.device)
             rows.append(model(**enc).logits[:, -1].float())
         return torch.cat(rows)
@@ -110,12 +112,12 @@ class LocalBackend:
     @torch.no_grad()
     def choose(self, role: str, chats: list[Chat], n_labels: int) -> list[list[float]]:
         if role == "receiver":
-            tok, logits = self.tok, self._next_logits(self.policy, self.tok, chats)
+            tok, logits = self.tok, self._next_logits(self.policy, self.tok, chats, NO_GRAD_BATCH)
         elif self.monitor is None:
             with self._base() as base:
-                tok, logits = self.tok, self._next_logits(base, self.tok, chats)
+                tok, logits = self.tok, self._next_logits(base, self.tok, chats, NO_GRAD_BATCH)
         else:
-            tok, logits = self.mon_tok, self._next_logits(self.monitor, self.mon_tok, chats)
+            tok, logits = self.mon_tok, self._next_logits(self.monitor, self.mon_tok, chats, NO_GRAD_BATCH)
         full = logits.softmax(-1)[:, self._label_ids(tok, n_labels)]
         if role not in self._reported_label_mass:  # sanity check that the chooser really answers with a letter
             print(f"{role}: mean probability mass on the {n_labels} labels = {full.sum(-1).mean().item():.3f}", flush=True)
@@ -155,7 +157,7 @@ class LocalBackend:
         for batch in self._batches(receiver, self.args.micro_batch):
             n_labels = max(i for _, i in receiver) + 1
             label_ids = torch.tensor(self._label_ids(self.tok, n_labels), device=self.device)
-            logits = self._next_logits(self.policy, self.tok, [c for c, _ in batch])
+            logits = self._next_logits(self.policy, self.tok, [c for c, _ in batch], len(batch))
             ce = F.cross_entropy(logits, label_ids[[i for _, i in batch]], reduction="sum") / len(receiver)
             ce.backward()
             loss_recv += ce.item()

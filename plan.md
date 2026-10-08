@@ -4,6 +4,11 @@ Updated 2026-10-08. The shareable version of this plan is the doc
 [Steganography organism: plan and spike](https://claude.ai/code/artifact/0e6e8816-b1a3-4cf8-b4f7-fd536a7d7371).
 The earlier Codenames plan is in [docs/codenames-plan.md](docs/codenames-plan.md).
 
+- Code:
+  [github.com/robbiethompson18/cot-codenames](https://github.com/robbiethompson18/cot-codenames)
+- Checkpoints and rollouts:
+  [huggingface.co/robbiethompson2018/cot-codenames-stego](https://huggingface.co/robbiethompson2018/cot-codenames-stego)
+
 **Question:** if we train a model against one monitoring technique, do the other techniques still
 work? Training a model to hide a payload in text is known (Mathew et al. 2024, Karpov et al. 2025,
 up to about 4.6 bits). Evading activation probes is known, and transfers between probes of the same
