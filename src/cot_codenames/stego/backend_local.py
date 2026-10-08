@@ -77,31 +77,62 @@ class LocalBackend:
         for i in range(0, len(items), size):
             yield items[i : i + size]
 
-    @torch.no_grad()
-    def sample(self, chats: list[Chat], max_tokens: int, thinking: bool = False) -> list[Sample]:
+    def _generate(self, rows: list[list[int]], max_new_tokens: int, stop: list[int]) -> list[list[int]]:
+        """Sample a continuation of each token row at temperature 1, cut after the first stop token (kept)."""
         out = []
-        eos = self.tok.eos_token_id
-        for batch in self._batches(chats, NO_GRAD_BATCH):
-            enc = self.tok([_render(self.tok, c, thinking) for c in batch], return_tensors="pt", padding=True, add_special_tokens=False).to(
-                self.device
-            )
+        for batch in self._batches(rows, NO_GRAD_BATCH):
+            width = max(map(len, batch))
+            ids = torch.full((len(batch), width), self.tok.pad_token_id, device=self.device)
+            attn = torch.zeros((len(batch), width), dtype=torch.long, device=self.device)
+            for i, row in enumerate(batch):  # left-padded, so every row's last position is real
+                ids[i, width - len(row) :] = torch.tensor(row)
+                attn[i, width - len(row) :] = 1
             # Plain temperature-1 sampling, with the checkpoint's default top-k/top-p turned off, so the distribution
             # we sample from is the one the policy gradient differentiates.
-            gen = self.policy.generate(**enc, max_new_tokens=max_tokens, do_sample=True, temperature=1.0, top_k=0, top_p=1.0)
-            for chat, prompt_ids, mask, row in zip(batch, enc.input_ids, enc.attention_mask, gen[:, enc.input_ids.shape[1] :].tolist()):
-                # Keep tokens up to and including the first EOS, so the policy is also trained on when to stop.
-                completion = row[: row.index(eos) + 1] if eos in row else row
-                raw = {"prompt_ids": prompt_ids[mask.bool()].tolist(), "completion_ids": completion}
-                if thinking:
-                    # Decoded with special tokens kept so the </think> boundary survives, then the chat markers removed.
-                    full = self.tok.decode(completion, skip_special_tokens=False)
-                    for marker in self.tok.all_special_tokens:
-                        if "think" not in marker:
-                            full = full.replace(marker, "")
-                    cot, text = game.split_reasoning(full)
-                else:
-                    cot, text = "", self.tok.decode(completion, skip_special_tokens=True).strip()
-                out.append(Sample(chat, text, raw, cot))
+            gen = self.policy.generate(
+                input_ids=ids,
+                attention_mask=attn,
+                max_new_tokens=max_new_tokens,
+                do_sample=True,
+                temperature=1.0,
+                top_k=0,
+                top_p=1.0,
+                eos_token_id=stop,
+            )
+            for new in gen[:, width:].tolist():
+                cut = min((new.index(t) + 1 for t in stop if t in new), default=len(new))
+                out.append(new[:cut])
+        return out
+
+    @torch.no_grad()
+    def sample(self, chats: list[Chat], max_tokens: int, thinking: bool = False) -> list[Sample]:
+        eos = self.tok.eos_token_id
+        prompts = [self.tok(_render(self.tok, c, thinking), add_special_tokens=False).input_ids for c in chats]
+        if not thinking:
+            # The EOS is kept in the completion so the policy is also trained on when to stop.
+            essays = self._generate(prompts, max_tokens, [eos])
+            texts = [self.tok.decode(e, skip_special_tokens=True).strip() for e in essays]
+            return [
+                Sample(c, t, {"prompt_ids": p, "completion_ids": e, "forced": (0, 0)}) for c, p, e, t in zip(chats, prompts, essays, texts)
+            ]
+        # Reasoning has a hard budget of --thinking-tokens. A sender still reasoning at the limit has its reasoning closed
+        # for it and then writes the essay. The inserted closing tokens were not sampled, so `forced` marks them and the
+        # policy-gradient loss skips them.
+        (close,) = self.tok.encode("</think>", add_special_tokens=False)
+        closing = self.tok.encode("\n</think>\n\n", add_special_tokens=False)
+        cots = self._generate(prompts, self.args.thinking_tokens, [eos, close])
+        forced = [(len(c), len(c) + len(closing)) if c[-1] not in (eos, close) else (0, 0) for c in cots]
+        cots = [c + closing if f != (0, 0) else c for c, f in zip(cots, forced)]
+        # A sender that emitted EOS inside its reasoning wrote no essay; everyone else continues to the essay.
+        go = [i for i, c in enumerate(cots) if c[-1] != eos]
+        essays: list[list[int]] = [[] for _ in chats]
+        for i, e in zip(go, self._generate([prompts[i] + cots[i] for i in go], max_tokens, [eos])):
+            essays[i] = e
+        out = []
+        for chat, prompt, cot, essay, span in zip(chats, prompts, cots, essays, forced):
+            raw = {"prompt_ids": prompt, "completion_ids": cot + essay, "forced": span}
+            reasoning, _ = game.split_reasoning(self.tok.decode(cot, skip_special_tokens=True))
+            out.append(Sample(chat, self.tok.decode(essay, skip_special_tokens=True).strip(), raw, reasoning))
         return out
 
     def _next_logits(self, model, tok, chats: list[Chat], batch_size: int) -> torch.Tensor:
@@ -151,6 +182,8 @@ class LocalBackend:
             for i, ((s, _), seq) in enumerate(zip(batch, seqs)):
                 ids[i, : len(seq)] = torch.tensor(seq)
                 essay[i, len(s.raw["prompt_ids"]) : len(seq)] = True
+                lo, hi = s.raw["forced"]
+                essay[i, len(s.raw["prompt_ids"]) + lo : len(s.raw["prompt_ids"]) + hi] = False  # tokens we inserted, not sampled
             attn = ids != self.tok.pad_token_id
             attn[essay] = True  # an essay's EOS can share an id with the pad token
             logits = self.policy(input_ids=ids, attention_mask=attn).logits[:, :-1].float()

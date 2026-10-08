@@ -188,6 +188,7 @@ def main() -> None:
         help="frozen monitor. Same as --model = the base model without the LoRA. A claude-* id = that model through the API",
     )
     ap.add_argument("--sender-thinking", action="store_true", help="let the sender reason before the essay (local backend)")
+    ap.add_argument("--thinking-tokens", type=int, default=300, help="hard budget for the sender's reasoning; it is closed at the limit")
     ap.add_argument(
         "--monitor-sees",
         choices=["essay", "both"],
@@ -203,7 +204,7 @@ def main() -> None:
     ap.add_argument("--steps", type=int, default=100)
     ap.add_argument("--prompts", type=int, default=8, help="(secret, topic) prompts per step")
     ap.add_argument("--k", type=int, default=8, help="essays sampled per prompt (the RLOO group)")
-    ap.add_argument("--max-tokens", type=int, default=320)
+    ap.add_argument("--max-tokens", type=int, default=320, help="token limit for the essay")
     ap.add_argument("--eval-every", type=int, default=25)
     ap.add_argument("--eval-episodes", type=int, default=64)
     ap.add_argument("--lr", type=float, default=5e-5)
