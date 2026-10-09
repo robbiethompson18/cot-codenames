@@ -12,12 +12,10 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 import transformers
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, PeftModel, get_peft_model
 
 from cot_codenames.stego import game
 from cot_codenames.stego.game import Chat, Sample
-
-NO_GRAD_BATCH = 64  # sequences per pass when sampling or scoring; --micro-batch only bounds passes that keep gradients
 
 
 def _load(name: str, device: str):
@@ -57,7 +55,15 @@ class LocalBackend:
             exclude_modules=r".*(visual|vision).*",  # text-only task: leave the vision tower alone
             task_type="CAUSAL_LM",
         )
-        self.policy = get_peft_model(base, lora)
+        if args.init_adapter:
+            # Continue from an earlier run's checkpoint ("<run>/ckpt-NNNN" in the Hugging Face repo), e.g. to swap in a
+            # stronger monitor. Its rank comes from the checkpoint, not --lora-rank.
+            from huggingface_hub import snapshot_download
+
+            root = snapshot_download(args.hf_repo, allow_patterns=[f"runs/{args.init_adapter}/*"])
+            self.policy = PeftModel.from_pretrained(base, f"{root}/runs/{args.init_adapter}", is_trainable=True)
+        else:
+            self.policy = get_peft_model(base, lora)
         self.policy.print_trainable_parameters()
         if args.monitor_model == args.model or args.monitor_model.startswith("claude"):  # API monitors live in train.py
             self.mon_tok, self.monitor = self.tok, None
@@ -80,7 +86,7 @@ class LocalBackend:
     def _generate(self, rows: list[list[int]], max_new_tokens: int, stop: list[int]) -> list[list[int]]:
         """Sample a continuation of each token row at temperature 1, cut after the first stop token (kept)."""
         out = []
-        for batch in self._batches(rows, NO_GRAD_BATCH):
+        for batch in self._batches(rows, self.args.score_batch):
             width = max(map(len, batch))
             ids = torch.full((len(batch), width), self.tok.pad_token_id, device=self.device)
             attn = torch.zeros((len(batch), width), dtype=torch.long, device=self.device)
@@ -153,7 +159,7 @@ class LocalBackend:
         # Few-shot monitor prompts are several times longer than plain ones, so the batch shrinks to keep roughly the
         # same number of tokens per pass (about 4 characters per token, 600 tokens for a plain prompt).
         longest = max(len(c[0]["content"]) for c in chats) // 4
-        batch = max(1, min(NO_GRAD_BATCH, NO_GRAD_BATCH * 600 // max(600, longest)))
+        batch = max(1, min(self.args.score_batch, self.args.score_batch * 600 // max(600, longest)))
         if role == "receiver":
             tok, logits = self.tok, self._next_logits(self.policy, self.tok, chats, batch)
         elif self.monitor is None:
