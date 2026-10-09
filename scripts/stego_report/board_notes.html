@@ -1,5 +1,7 @@
 <section><div class="sheet"><ul>
-<li><b>All seven runs were restarted at about 3:50 PM Pacific.</b> Three ran out of GPU memory on their first training step, and three more were stuck for 35 minutes installing packages. Both are fixed. Roughly $30 of GPU time was lost.</li>
-<li><b>The first GPU run (old referee, 9B monitor) finished:</b> receiver 98%, monitor 28% at step 100.</li>
-<li><b>Three of the four no-training experiments are in</b> (table at the bottom). The short version: the learned convention is shared across runs, it survives paraphrase, and Sonnet can tell that a word is hidden in 94–97% of trained essays.</li>
+<li><b>Plan changed at about 5 PM Pacific.</b> Training from scratch against a same-size (27B) monitor collapses: the sender stops communicating. So the current runs train against the weaker 9B monitor, with and without sender reasoning, plus one bootstrapping run that swaps in the 27B after a code already exists.</li>
+<li><b>Sender reasoning, before any training:</b> the sender writes the secret word in its reasoning 100% of the time, and a monitor reading that reasoning gets 100%.</li>
+<li><b>Reasoning-on runs use half the batch</b> (4 essays per prompt, not 8) to keep cost down, so their curves are noisier.</li>
+<li><b>On hold until there is more RunPod balance:</b> the 1,000-token essay-only run and the 300-word runs at ranks 8, 32 and 128.</li>
+<li>Each reasoning-on panel also logs what an untrained-against monitor gets from the reasoning alone, the essay alone, and both; that view is not charted here yet.</li>
 </ul></div></section>
