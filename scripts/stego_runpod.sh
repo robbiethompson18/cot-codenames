@@ -38,17 +38,11 @@ printf 'export HF_TOKEN=%s\nexport ANTHROPIC_API_KEY=%s\nexport HF_HOME=/root/hf
   ssh "${ssh_opts[@]}" "root@$host" 'umask 077; cat > /root/.stego_env'
 
 args=$(printf '%q ' "$@")
-# The Triton upgrade drags in a newer torch, which breaks the image's torchaudio/torchvision, so those are removed.
-# STEGO_SETUP=pip uses the image's own torch and upgrades Triton: with the image's Triton 3.5, flash-linear-attention
-# refuses to run the backward pass on H100/H200 ("incorrect results for gated chunk_bwd").
-# Background: `uv sync` re-downloads torch and has stalled for 30+ minutes in some
-# datacenters. Either way \$py is the interpreter the run uses.
-if [ "${STEGO_SETUP:-uv}" = pip ]; then
-  setup='pip install -q --break-system-packages transformers peft accelerate huggingface_hub anthropic flash-linear-attention "triton>=3.7.1" && pip uninstall -y -q --break-system-packages torchaudio torchvision 2>/dev/null; true && pip install -q --break-system-packages --no-deps -e . ; py=python'
-else
-  # uv has stalled mid-download in some datacenters, so it gets 10 minutes and one retry.
-  setup='pip install -q uv 2>/dev/null; timeout 600 uv sync -q --group train || timeout 900 uv sync -q --group train; py="uv run python"'
-fi
+# Setup is `uv sync` from the lockfile. Do not swap in the pod image's own torch to save download time: tried twice on
+# 2026-10-08 and it failed three different ways (flash-linear-attention rejects the image's Triton 3.5 for training;
+# upgrading Triton pulls a newer torch that breaks torchaudio; and Triton 3.8 then finds no GPU driver).
+# uv has stalled mid-download in some datacenters, so it gets 10 minutes and one retry.
+setup='pip install -q uv 2>/dev/null; timeout 600 uv sync -q --group train || timeout 900 uv sync -q --group train; py="uv run python"'
 ssh "${ssh_opts[@]}" "root@$host" "cat > /workspace/run_$run.sh" <<REMOTE
 source /root/.stego_env
 cd /workspace/cot-codenames
