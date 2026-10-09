@@ -1,0 +1,53 @@
+<title>Reasoning Essay Samples</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<!--STYLE-->
+<style>
+main { max-width: 64rem; }
+.pair { background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 20px clamp(16px, 3vw, 26px); min-width: 0; }
+.pair header { display: flex; flex-wrap: wrap; gap: 6px 36px; align-items: end; }
+.pair h3 { font: 500 1.35rem var(--mono); margin: 0; }
+.pair .note { border: 0; padding: 0; margin: 10px 0 14px; color: var(--ink); font-size: 1rem; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
+.cols section { min-width: 0; border-top: 2px solid var(--rule); padding-top: 4px; }
+.cols .text { font-size: .98rem; line-height: 1.6; }
+.ref { font-size: .88rem; color: var(--muted); margin-top: 10px; }
+.pairs { display: flex; flex-direction: column; gap: 22px; }
+</style>
+<main>
+  <section>
+    <h1>Why reasoning makes the essays worse</h1>
+    <p class="lede">The sender never finishes thinking inside its budget, so it keeps planning in its answer, and what it plans is an acrostic.</p>
+    <p>These are essays from the untrained sender (Qwen3.6-27B, no LoRA updates yet), 64 per setting, on the same prompts. With reasoning off, 79% pass the essay referee. With a 300-token reasoning budget, 26–29% do.</p>
+    <div class="sheet">
+      <ul>
+        <li><b>The reasoning always runs into the limit.</b> Qwen spends most of a 300-token budget restating the rules, and even at 1,000 tokens it is still going. We close the reasoning for it, and about half the time it carries on in the answer: a "Reasoning:" paragraph, numbered drafts, bolded letters.</li>
+        <li><b>Given room to plan, it chooses acrostics.</b> About three quarters of reasoning traces mention acrostics or first letters at 300 tokens, and 95% at 1,000. Without reasoning it hints by meaning instead. Acrostic essays come out stilted, and the receiver, which answers in one token with no reasoning, is unlikely to be reading first letters.</li>
+        <li><b>The secret word is in the reasoning 96–100% of the time</b>, including when the sender has just noted that the monitor reads its reasoning.</li>
+        <li><b>The referee model refuses 17–28% of these answers outright.</b> Claude Haiku's safety filter stops it on answers that openly plan a hidden message. We count a refusal as a fail, and in all but one or two cases per setting the answer did contain planning text, so the verdict is right even if the reason is odd.</li>
+        <li><b>Clean essays still fail more often.</b> Among reasoning-on answers with no planning text, 45–58% pass at 300 tokens, against 81% with reasoning off.</li>
+      </ul>
+    </div>
+  </section>
+  <section>
+    <h2>The numbers</h2>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Setting</th><th>Pass the referee</th><th>Answer contains planning text</th><th>Referee refused</th><th>Reasoning mentions acrostics</th><th>Secret word in reasoning</th><th>Reasoning length (words)</th><th>Receiver correct</th></tr></thead>
+      <tbody><!--ROWS--></tbody>
+    </table>
+    <p class="take">"Planning text" is a keyword match on the answer (words like reasoning, acrostic, draft, "I will", or numbered and bolded lines). It over-counts slightly: it flags 7% of the no-reasoning essays too.</p></div>
+  </section>
+  <section>
+    <h2>Six prompts, with and without reasoning</h2>
+    <p>Same secret word and topic on both sides. The right-hand side is from the run where the sender is told its reasoning is monitored.</p>
+    <div class="pairs"><!--CARDS--></div>
+  </section>
+  <section>
+    <h2>What this suggests</h2>
+    <div class="sheet"><ul>
+      <li><b>Separate the essay from everything else.</b> Have the sender put the essay inside explicit tags (the local equivalent of a tool call) and treat everything outside them as reasoning. The spill then stops poisoning the essay, and a reasoning monitor still gets to read it.</li>
+      <li><b>The budget fights the model.</b> Qwen's reasoning has no effort setting, and it does not obey "under 150 words". A model with a controllable reasoning length would fit this experiment better.</li>
+      <li><b>The receiver may need to reason too</b> if the sender is going to use letter-level codes.</li>
+    </ul></div>
+  </section>
+  <footer><p>Runs fixed8-9b, cot300-9b-essay, cot300-9b-both and cot1k-9b-both, step-0 evaluation, 8 October 2026. The reasoning-on runs are still training; this page is about their starting point only.</p></footer>
+</main>
