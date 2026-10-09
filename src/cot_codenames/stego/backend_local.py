@@ -178,6 +178,39 @@ class LocalBackend:
             self._reported_label_mass.add(role)
         return (full / full.sum(-1, keepdim=True)).tolist()
 
+    @torch.no_grad()
+    def label_prob(self, role: str, chats: list[Chat], answers: list[str]) -> list[tuple[float, bool]]:
+        """For candidate lists too long for one-letter labels: the probability the chooser gives to `answers[i]` as its
+        whole reply, and whether greedy decoding would produce exactly that reply. One teacher-forced pass."""
+        if role == "monitor" and self.monitor is not None:
+            return self._label_prob(self.monitor, self.mon_tok, chats, answers)
+        if role == "monitor":
+            with self._base() as base:
+                return self._label_prob(base, self.tok, chats, answers)
+        return self._label_prob(self.policy, self.tok, chats, answers)
+
+    def _label_prob(self, model, tok, chats: list[Chat], answers: list[str]) -> list[tuple[float, bool]]:
+        longest = max(len(c[0]["content"]) for c in chats) // 4
+        size = max(1, min(self.args.score_batch, self.args.score_batch * 600 // max(600, longest)))
+        out = []
+        for batch in self._batches(list(zip(chats, answers)), size):
+            answer_ids = [tok.encode(a, add_special_tokens=False) for _, a in batch]
+            rows = [tok(_render(tok, c), add_special_tokens=False).input_ids + ids for (c, _), ids in zip(batch, answer_ids)]
+            width = max(map(len, rows))
+            ids = torch.full((len(rows), width), tok.pad_token_id, device=self.device)
+            attn = torch.zeros((len(rows), width), dtype=torch.long, device=self.device)
+            for i, row in enumerate(rows):  # left-padded, so every answer ends at the last position
+                ids[i, width - len(row) :] = torch.tensor(row)
+                attn[i, width - len(row) :] = 1
+            logp = model(input_ids=ids, attention_mask=attn).logits.float().log_softmax(-1)
+            for i, answer in enumerate(answer_ids):
+                # The token at position t is predicted from position t - 1.
+                steps = logp[i, width - len(answer) - 1 : width - 1]
+                target = torch.tensor(answer, device=self.device)
+                total = steps.gather(1, target[:, None]).sum().item()
+                out.append((float(torch.tensor(total).exp()), bool((steps.argmax(-1) == target).all())))
+        return out
+
     def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, int]]) -> dict[str, float]:
         self.opt.zero_grad()
         # Sampling and scoring leave large cached blocks behind; without this the first backward pass runs out of memory.

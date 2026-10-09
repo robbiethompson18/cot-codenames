@@ -44,6 +44,11 @@ class Backend(Protocol):
         role "receiver" uses the current policy; role "monitor" uses the frozen monitor model."""
         ...
 
+    def label_prob(self, role: str, chats: list[Chat], answers: list[str]) -> list[tuple[float, bool]]:
+        """For candidate lists too long for one-letter labels (see game.labels): the probability the chooser gives
+        to each chat's answer string, and whether its greedy reply would be exactly that string."""
+        ...
+
     def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, int]]) -> dict[str, float]:
         """One optimizer step on the shared LoRA. `sender` is (sample, advantage): policy gradient on the essay tokens.
         `receiver` is (chooser chat, index of the correct label): cross-entropy on the answer token. Returns metrics."""
@@ -90,7 +95,13 @@ def monitor_dists(backend: Backend, chats: list[Chat], args: argparse.Namespace)
 
 
 def play(
-    backend: Backend, rng: random.Random, episodes: list[Episode], pool: list[str], shots: list[dict], args: argparse.Namespace
+    backend: Backend,
+    rng: random.Random,
+    episodes: list[Episode],
+    pool: list[str],
+    shots: list[dict],
+    args: argparse.Namespace,
+    all_words: list[str] | None = None,
 ) -> list[dict]:
     """Sample one essay per episode and score it. `shots` are earlier essays with their secrets, shown to the monitor
     when --monitor-shots is set. Returns one rollout dict per episode; the keys starting with "_" hold objects the
@@ -110,7 +121,9 @@ def play(
             sample.cot, sample.text = game.split_plan(sample.text)
     lap("sample")
     recv = [game.candidates(rng, e.secret, pool, args.m) for e in episodes]
-    mon = [game.candidates(rng, e.secret, pool, args.n) for e in episodes]
+    # A monitor list longer than the pool is filled out with other words from the same split.
+    mon_pool = pool if len(pool) >= args.n or all_words is None else all_words
+    mon = [game.candidates(rng, e.secret, mon_pool, args.n) for e in episodes]
     recv_chats = [game.chooser_chat("receiver", e.topic, s.text, c) for e, s, (c, _) in zip(episodes, samples, recv)]
     claude = args.monitor_model.startswith("claude")
 
@@ -122,7 +135,15 @@ def play(
         return [remonitor.monitor_chat(d, few, force_answer=force) for d in seen]
 
     p_recv = backend.choose("receiver", recv_chats, args.m)
-    p_mon, mon_text = monitor_dists(backend, mon_chats(args.monitor_sees, shots, claude), args)
+    if args.n > len(game.LABELS):
+        # Too many candidates for a one-token answer: score the true label's probability and the greedy answer instead.
+        answers = [game.labels(args.n)[i] for _, i in mon]
+        scored = backend.label_prob("monitor", mon_chats(args.monitor_sees, shots, False), answers)
+        p_true, mon_right, p_mon, mon_text = [p for p, _ in scored], [ok for _, ok in scored], None, [""] * len(episodes)
+    else:
+        p_mon, mon_text = monitor_dists(backend, mon_chats(args.monitor_sees, shots, claude), args)
+        p_true = [d[i] for d, (_, i) in zip(p_mon, mon)]
+        mon_right = [max(d) > 0 and max(range(args.n), key=d.__getitem__) == i for d, (_, i) in zip(p_mon, mon)]
     # With reasoning on, the base model also reads each view as a monitor that is never trained against, so every run
     # shows what a reader of the reasoning would have caught.
     views = {}
@@ -151,15 +172,15 @@ def play(
                 "judge_text": verdicts[i]["text"],
                 "leaked": leak,
                 "p_recv": p_recv[i][ri],
-                "p_mon": p_mon[i][mi],
+                "p_mon": p_true[i],
                 "recv_correct": max(range(args.m), key=p_recv[i].__getitem__) == ri,
-                "mon_correct": max(p_mon[i]) > 0 and max(range(args.n), key=p_mon[i].__getitem__) == mi,
+                "mon_correct": mon_right[i],
                 "recv_candidates": recv[i][0],
-                "mon_candidates": mon[i][0],
+                "mon_candidates": mon[i][0] if args.n <= len(game.LABELS) else [],  # 500 words per essay is too much to log
                 "recv_probs": [round(p, 4) for p in p_recv[i]],
-                "mon_probs": [round(p, 4) for p in p_mon[i]],
+                "mon_probs": [round(p, 4) for p in p_mon[i]] if p_mon else [],
                 "mon_text": mon_text[i],
-                "reward": game.reward(p_recv[i][ri], p_mon[i][mi], valid, args.cur_lam, args.fail_reward),
+                "reward": game.reward(p_recv[i][ri], p_true[i], valid, args.cur_lam, args.fail_reward),
                 "_sample": s,
                 "_recv": (recv_chats[i], ri),
                 "_tokens": (verdicts[i]["in"], verdicts[i]["out"]),
@@ -218,6 +239,10 @@ def main() -> None:
     ap.add_argument("--monitor-shots", type=int, default=0, help="show the monitor this many recent essays with their secrets")
     ap.add_argument("--binary-reward", action="store_true", help="penalise the monitor's top guess (0 or 1), not its probability")
     ap.add_argument("--pool-size", type=int, default=0, help="restrict secrets to this many fixed training words (0 = whole train split)")
+    ap.add_argument("--pool-grow", action="store_true", help="start at --pool-size words and double the pool as the score holds")
+    ap.add_argument("--pool-max", type=int, default=256, help="largest pool --pool-grow reaches")
+    ap.add_argument("--grow-score", type=float, default=0.4, help="mean score of the last 5 batches needed to double the pool")
+    ap.add_argument("--grow-min-steps", type=int, default=15, help="fewest steps between doublings")
     ap.add_argument("--m", type=int, default=8, help="receiver's candidate list size")
     ap.add_argument("--n", type=int, default=8, help="monitor's candidate list size")
     ap.add_argument("--lam", type=float, default=1.0, help="monitor penalty weight; 0 = control arm")
@@ -254,10 +279,10 @@ def main() -> None:
         start, end = args.lam_ramp
         return args.lam * min(1.0, max(0.0, (step - start) / (end - start)))
 
-    train_words, heldout_words = game.load_words()
+    all_train, heldout_words = game.load_words()
     topics = game.load_topics(args.topics == "broad")
-    if args.pool_size:
-        train_words = train_words[: args.pool_size]
+    pool_n = args.pool_size or len(all_train)  # words in play; grows under --pool-grow
+    last_growth, recent_scores = 0, []
     run_dir = Path("runs/stego") / args.run
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "config.json").write_text(
@@ -274,11 +299,15 @@ def main() -> None:
 
     def evaluate(step: int) -> None:
         args.cur_lam = lam_at(step)
-        # A pool no bigger than the candidate list leaves no unseen secrets worth testing, so only it is evaluated.
-        splits = {"train": train_words} if 0 < args.pool_size <= max(args.m, args.n) else {"train": train_words, "heldout": heldout_words}
-        for split, words in splits.items():
-            rollouts = play(backend, rng, episodes(words, args.eval_episodes), words, shots(), args)
-            metrics = {"step": step, "split": split} | summarise(rollouts, args)
+        train_words = all_train[:pool_n]
+        # A small fixed pool leaves no unseen secrets worth testing, unless the point of the run is to grow it.
+        small = 0 < args.pool_size <= max(args.m, min(args.n, len(game.LABELS))) and not args.pool_grow
+        splits = (
+            {"train": (train_words, all_train)} if small else {"train": (train_words, all_train), "heldout": (heldout_words, heldout_words)}
+        )
+        for split, (words, split_words) in splits.items():
+            rollouts = play(backend, rng, episodes(words, args.eval_episodes), words, shots(), args, split_words)
+            metrics = {"step": step, "split": split, "pool": pool_n} | summarise(rollouts, args)
             print("EVAL", json.dumps(metrics), flush=True)
             log(run_dir / "metrics.jsonl", [{"kind": "eval"} | metrics])
             log(run_dir / "rollouts.jsonl", [{"step": step, "split": split, "kind": "eval"} | r for r in rollouts])
@@ -297,8 +326,16 @@ def main() -> None:
         t0 = time.time()
         args.cur_lam = lam_at(step)
         # Each prompt is repeated k times so its essays share a leave-one-out baseline.
-        eps = [e for e in episodes(train_words, args.prompts) for _ in range(args.k)]
-        rollouts = play(backend, rng, eps, train_words, shots(), args)
+        train_words = all_train[:pool_n]
+        if args.pool_grow and pool_n > args.pool_size:
+            # Half the prompts use words added at the last doubling and half replay older ones, which keeps the reward
+            # the sender already earns on old words while the new ones are learned.
+            half = args.prompts // 2
+            prompts = episodes(train_words[pool_n // 2 :], half) + episodes(train_words[: pool_n // 2], args.prompts - half)
+        else:
+            prompts = episodes(train_words, args.prompts)
+        eps = [e for e in prompts for _ in range(args.k)]
+        rollouts = play(backend, rng, eps, train_words, shots(), args, all_train)
         advantages = [a for g in range(0, len(rollouts), args.k) for a in game.rloo([r["reward"] for r in rollouts[g : g + args.k]])]
         step_metrics = backend.step(
             sender=[(r["_sample"], a) for r, a in zip(rollouts, advantages)],
@@ -309,8 +346,14 @@ def main() -> None:
         metrics = (
             {"step": step, "lam": round(args.cur_lam, 3)} | summarise(rollouts, args) | step_metrics | {"secs": round(time.time() - t0, 1)}
         )
+        metrics["pool"] = pool_n
         print(json.dumps(metrics), flush=True)
         log(run_dir / "metrics.jsonl", [{"kind": "train"} | metrics])
+        recent_scores = [*recent_scores, metrics["judge_pass"] * (metrics["recv_correct"] - metrics["mon_correct"])][-5:]
+        steady = len(recent_scores) == 5 and sum(recent_scores) / 5 >= args.grow_score
+        if args.pool_grow and steady and step - last_growth >= args.grow_min_steps and pool_n < args.pool_max:
+            pool_n, last_growth, recent_scores = min(2 * pool_n, args.pool_max), step, []
+            print(f"pool doubled to {pool_n} words at step {step}", flush=True)
         log(run_dir / "rollouts.jsonl", [{"step": step, "split": "train", "kind": "train"} | r for r in rollouts])
 
 

@@ -193,6 +193,9 @@ class TinkerBackend:
         metrics = {"loss_pg": pg.metrics["loss:sum"] / len(pg_data), "loss_recv": recv.metrics["loss:sum"] / len(recv_data)}
         return {k: round(v, 4) for k, v in (metrics | (optim.metrics or {})).items()}
 
+    def label_prob(self, role: str, chats: list[Chat], answers: list[str]) -> list[tuple[float, bool]]:
+        raise NotImplementedError("candidate lists longer than 52 are only implemented in the local backend")
+
     def save(self, path: Path) -> None:
         """`state` resumes training (create_training_client_from_state); `sampler` is the path that
         tinker_cookbook.weights.download + build_lora_adapter turn into a PEFT adapter."""

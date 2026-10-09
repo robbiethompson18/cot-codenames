@@ -60,6 +60,12 @@ Current docs:
 **Stego runs live on Hugging Face, not git:** `runs/stego/` is gitignored; checkpoints and rollouts
 upload to `robbiethompson2018/cot-codenames-stego` via `--hf-repo`.
 
+**Do not train against a monitor that reads the sender's reasoning or plan (Robbie, 2026-10-09), for
+now.** The monitor in the reward reads the essay only (`--monitor-sees essay`, the default). Three
+earlier runs did train against a reasoning or plan reader (`cot300-9b-both`, `cot1k-9b-both`,
+`plan-9b-monitored`); do not repeat that without asking. Logging what a reader of the reasoning
+would get is fine.
+
 **Tinker is banned (Robbie, 2026-10-08): too expensive.** Do not train or sample through Tinker,
 including for small tests. A 100-step run cost about $42 there against about $9 on a RunPod H200.
 Train on RunPod (`scripts/stego_runpod.sh`). `backend_tinker.py` and the `--tinker` option of

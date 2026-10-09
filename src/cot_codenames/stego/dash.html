@@ -13,7 +13,7 @@
 @media (prefers-color-scheme: dark) { :root {
   --bg: #12171d; --sheet: #1a212a; --ink: #e4e9ee; --muted: #9aa7b4; --rule: #2e3945; --grid: #27313c; --hover: #222b36;
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --good: #5fcf88; --warn: #e0a83a; --bad: #f08a7e; --live: #86b6ef; color-scheme: dark } }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; } :root { --tint: color-mix(in srgb, var(--live) 14%, transparent); }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); padding: 20px 16px 60px; }
 h1 { font-size: 1.3rem; margin: 0 0 2px; } h2 { font-size: 1.1rem; margin: 0 0 4px; font-family: var(--mono); font-weight: 600; }
 h3 { font-size: .85rem; margin: 0 0 6px; }
@@ -23,8 +23,18 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
 th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
 th { color: var(--muted); font-weight: 500; font-size: .75rem; white-space: nowrap; position: sticky; top: 0; background: var(--sheet); }
 tbody tr { cursor: pointer; } tbody tr:hover, tbody tr.sel { background: var(--hover); }
-thead th { cursor: pointer; user-select: none; } thead th:hover { color: var(--ink); }
-td b { font: 600 .85rem var(--mono); } td .sub { display: block; max-width: 30ch; } td .sub.why { max-width: 18ch; } td.nw { white-space: nowrap; }
+#head th { cursor: pointer; user-select: none; } #head th:hover { color: var(--ink); }
+.fbtn { all: unset; cursor: pointer; display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; border-radius: 3px; margin-left: 4px; vertical-align: -4px; opacity: .55; }
+.fbtn:hover { background: var(--hover); color: var(--ink); opacity: 1; } .fbtn.on { color: var(--live); background: var(--tint); opacity: 1; }
+#chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; } #chips:empty { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 5px; max-width: 360px; font-size: .75rem; padding: 1px 3px 1px 8px; border-radius: 4px; border: 1px solid var(--live); background: var(--tint); }
+.chip code { font: .75rem var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#chips button { all: unset; cursor: pointer; padding: 0 5px; border-radius: 3px; } #chips button:hover { background: var(--hover); } #chips .clear { color: var(--muted); font-size: .75rem; }
+#menu { position: absolute; z-index: 5; width: 280px; max-height: 320px; overflow-y: auto; background: var(--sheet); border: 1px solid var(--rule); border-radius: 5px; padding: 4px; box-shadow: 0 6px 20px rgba(0, 0, 0, .25); font-size: .78rem; }
+#menu label { display: flex; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 3px; cursor: pointer; } #menu label:hover { background: var(--hover); }
+#menu .n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+#menu button { all: unset; display: block; width: 100%; box-sizing: border-box; text-align: center; padding: 5px; margin-top: 4px; border-top: 1px solid var(--rule); color: var(--muted); cursor: pointer; }
+td b { font: 600 .85rem var(--mono); } td .sub { display: block; max-width: 30ch; } td .sub.why { max-width: 18ch; } td.nw { white-space: nowrap; } td.note { color: var(--muted); font-size: .8rem; min-width: 24ch; max-width: 36ch; }
 .pill { font: 500 .7rem var(--mono); padding: 1px 6px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
 .finished { color: var(--good); } .running, .setting { color: var(--live); } .stopped, .unknown, .crashed { color: var(--bad); }
 .prog { height: 5px; width: 90px; background: var(--rule); border-radius: 3px; margin-top: 5px; overflow: hidden; }
@@ -44,10 +54,12 @@ details { margin-top: 10px; } summary { cursor: pointer; color: var(--muted); }
 </head>
 <body>
 <div class="top"><h1>Stego runs</h1><span class="sub" id="stamp"></span><span class="sub">Refreshes every minute. Click a row for its curves and latest essays. Results are the latest evaluation on training words (64 essays, so ±6 points); "from" is the step-0 evaluation. Score = referee pass rate × (receiver − monitor).</span></div>
+<div id="chips"></div>
 <div class="scroll"><table>
 <thead><tr id="head"></tr></thead>
 <tbody id="rows"></tbody></table></div>
 <div id="detail" hidden></div>
+<div id="menu" hidden></div>
 <script>
 const E = s => String(s ?? "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
 const pct = v => v == null ? "—" : Math.round(v * 100) + "%";
@@ -55,7 +67,9 @@ const stamp = t => new Date(String(t).replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
 const when = t => isNaN(stamp(t)) ? "" : stamp(t).toLocaleString("en-US", {timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
 const pacific = t => when(t) ? when(t) + " Pacific" : (t || "?");
 // sortCol indexes COLS; null keeps the server's order (live runs first, then by start time).
-let runs = [], selected = location.hash.slice(1) || null, sortCol = null, sortDir = 1;
+// filters maps a COLS index to the values that column may have. menuCol is the column whose filter menu is open and
+// menuValues the values it lists.
+let runs = [], selected = location.hash.slice(1) || null, sortCol = null, sortDir = 1, filters = {}, menuCol = null, menuValues = [];
 
 function chart(series, {ymin = 0, ymax = 1, xmax, percent = true, chance = null}) {
   const w = 360, h = 190, L = 34, R = 44, T = 8, B = 22, pw = w - L - R, ph = h - T - B;
@@ -83,13 +97,6 @@ function panel(title, items, opts, note = "") {
   if (!items.some(s => s.pts.length)) return "";
   return `<div><h3>${E(title)}</h3>${legend(items.filter(s => !s.faint).map(s => [s.name, s.color]))}${chart(items, opts)}<div class="sub">${note}</div></div>`;
 }
-function latest(r, key) {
-  const ev = r.evals.filter(e => e.split === "train"); if (!ev.length) return "<span class='num'>—</span>";
-  const a = ev[0], b = ev[ev.length - 1];
-  const recent = r.train.slice(-5), avg = recent.length ? recent.reduce((t, m) => t + m[key], 0) / recent.length : null;
-  const live = recent.length && recent[recent.length - 1].step > b.step ? `<span class="from">last ${recent.length} batches: ${pct(avg)}</span>` : "";
-  return `<span class="num">${pct(b[key])}</span><span class="from">from ${pct(a[key])} · step ${b.step}</span>${live}`;
-}
 // One comparable number per run: 0 for a sender that says nothing or is fully read by the monitor, about 0.9 for a
 // perfect hidden message. Not the training reward, which depends on each run's own penalty settings.
 const score = e => e.judge_pass * (e.recv_correct - e.mon_correct);
@@ -102,11 +109,15 @@ function scoreCell(r) {
   return `<span class="num" style="color:var(${color})">${v.toFixed(2)}</span>${bar}<span class="from">from ${score(a).toFixed(2)} · step ${b.step}</span>`;
 }
 const lastEval = (r, f) => { const ev = r.evals.filter(e => e.split === "train"); return ev.length ? f(ev[ev.length - 1]) : null; };
-// Header label, sort key, tooltip. Same order as the cells in row().
-const COLS = [["Run", r => r.run], ["Score", r => lastEval(r, score), "referee pass rate × (receiver accuracy − monitor accuracy)"], ["Status", r => r.status],
-  ["Started (Pacific)", r => +stamp(r.started)], ["Sender / receiver", r => r.model.split("/").pop()], ["Monitor", r => r.monitor.split("/").pop()],
-  ["Referee", r => r.referee_rules], ["Thinking", r => r.thinking], ["Task", r => r.task], ["Reward", r => r.reward],
-  ["Receiver", r => lastEval(r, e => e.recv_correct)], ["Monitor", r => lastEval(r, e => e.mon_correct)], ["Referee pass", r => lastEval(r, e => e.judge_pass)], ["GPU cost", r => r.cost]];
+// Header label, sort key, tooltip, filter. Same order as the cells in row(). A column with a filter gets a funnel that
+// lists its distinct values: true filters on the sort key, a function on what it returns.
+const COLS = [["Run", r => r.run], ["Purpose", r => r.note], ["Score", r => lastEval(r, score), "referee pass rate × (receiver accuracy − monitor accuracy)"],
+  ["Status", r => r.status, "", r => r.status.match(/^(setting up|\S+)/)[0]], ["Started (Pacific)", r => +stamp(r.started)],
+  ["Sender / receiver", r => r.model.split("/").pop(), "", true], ["Monitor", r => r.monitor.split("/").pop(), "", true],
+  ["Referee", r => r.referee_rules, "", true], ["Thinking", r => r.thinking, "", true], ["Task", r => r.task, "", true], ["Reward", r => r.reward, "", true],
+  ["Receiver / monitor / referee", r => lastEval(r, e => e.recv_correct), "Latest evaluation on training words: receiver accuracy / monitor accuracy / referee pass rate. Sorts by receiver accuracy."],
+  ["GPU cost", r => r.cost]];
+const FUNNEL = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>`;
 const blank = v => v == null || v === "" || Number.isNaN(v);
 function sorted() {
   if (sortCol == null) return runs;
@@ -114,15 +125,30 @@ function sorted() {
   // Runs with no value sort last in both directions.
   return [...runs].sort((a, b) => { const x = key(a), y = key(b); return blank(x) || blank(y) ? blank(x) - blank(y) : sortDir * (typeof x === "number" ? x - y : String(x).localeCompare(String(y))); });
 }
+const category = (c, r) => String((c[3] === true ? c[1] : c[3])(r) || "—");
+const shown = () => sorted().filter(r => Object.entries(filters).every(([i, values]) => values.includes(category(COLS[i], r))));
+function setFilter(i, values) { if (values.length) filters[i] = values; else delete filters[i]; render(); }
+function drawMenu() {
+  const menu = document.getElementById("menu"); menu.hidden = menuCol == null; if (menuCol == null) return;
+  const counts = {}, on = filters[menuCol] || [];
+  for (const r of runs) { const v = category(COLS[menuCol], r); counts[v] = (counts[v] || 0) + 1; }
+  menuValues = [...new Set([...Object.keys(counts), ...on])].sort();
+  menu.innerHTML = menuValues.map((v, n) => `<label><input type="checkbox" data-n="${n}"${on.includes(v) ? " checked" : ""}><span>${E(v)}</span><span class="n">${counts[v] || 0}</span></label>`).join("") + (on.length ? `<button>Deselect all</button>` : "");
+}
+// One removable chip per filtered value, above the table.
+function drawChips() {
+  const chips = Object.entries(filters).flatMap(([i, values]) => values.map((v, n) => `<span class="chip"><span class="sub">${E(COLS[i][0])}:</span><code>${E(v)}</code><button data-i="${i}" data-n="${n}" aria-label="Remove filter">×</button></span>`));
+  document.getElementById("chips").innerHTML = chips.join("") + (chips.length > 1 ? `<button class="clear">Clear all</button>` : "");
+}
 function row(r) {
   // The pill holds the one-word state; any explanation after it wraps underneath.
   const [, state, why] = r.status.match(/^(setting up|\S+)\s*(.*)$/), cls = state.split(" ")[0];
-  return `<tr data-run="${E(r.run)}" class="${r.run === selected ? "sel" : ""}"><td><b>${E(r.run)}</b><span class="sub">${E(r.note)}</span></td><td>${scoreCell(r)}</td>
+  return `<tr data-run="${E(r.run)}" class="${r.run === selected ? "sel" : ""}"><td><b>${E(r.run)}</b></td><td class="note">${E(r.note)}</td><td>${scoreCell(r)}</td>
   <td><span class="pill ${cls}">${E(state)}</span><div class="prog"><i style="width:${Math.min(100, 100 * r.done / r.steps)}%"></i></div><span class="sub">step ${r.done} of ${r.steps}</span><span class="sub why">${E(why)}</span></td>
   <td class="nw">${E(when(r.started) || "—")}</td>
   <td>${E(r.model.split("/").pop())}<span class="sub">${E(r.lora)}</span></td><td>${E(r.monitor.split("/").pop())}<span class="sub">reads: ${E(r.monitor_sees)}</span></td>
   <td>${E(r.referee_rules)}<span class="sub">${E(r.referee)}</span></td><td>${E(r.thinking)}</td><td>${E(r.task)}</td><td>${E(r.reward)}</td>
-  <td>${latest(r, "recv_correct")}</td><td>${latest(r, "mon_correct")}</td><td>${latest(r, "judge_pass")}</td><td>${r.cost == null ? "—" : "≈$" + r.cost}</td></tr>`;
+  <td class="nw"><span class="num">${lastEval(r, e => [e.recv_correct, e.mon_correct, e.judge_pass].map(pct).join(" / ")) ?? "—"}</span></td><td>${r.cost == null ? "—" : "≈$" + r.cost}</td></tr>`;
 }
 function detail(r) {
   const tr = r.train, ev = r.evals.filter(e => e.split === "train"), ho = r.evals.filter(e => e.split === "heldout");
@@ -143,16 +169,26 @@ function detail(r) {
   return h + `<details><summary>Full config</summary><pre>${E(JSON.stringify(r.config, null, 2))}</pre></details>`;
 }
 function render() {
-  document.getElementById("head").innerHTML = COLS.map(([name, , tip], i) => `<th data-i="${i}" title="${E(tip || "")}">${E(name)}${i === sortCol ? (sortDir > 0 ? " ▲" : " ▼") : ""}</th>`).join("");
-  document.getElementById("rows").innerHTML = sorted().map(row).join("");
+  document.getElementById("head").innerHTML = COLS.map(([name, , tip], i) => `<th data-i="${i}" title="${E(tip || "")}">${E(name)}${i === sortCol ? (sortDir > 0 ? " ▲" : " ▼") : ""}${COLS[i][3] ? `<button class="fbtn${filters[i] ? " on" : ""}" data-f="${i}" aria-label="Filter ${E(name)}">${FUNNEL}</button>` : ""}</th>`).join("");
+  drawChips(); drawMenu(); const rows = shown();
+  document.getElementById("rows").innerHTML = rows.map(row).join("");
   const r = runs.find(x => x.run === selected), d = document.getElementById("detail");
   d.hidden = !r; if (r) d.innerHTML = detail(r);
-  document.getElementById("stamp").textContent = "Updated " + new Date().toLocaleTimeString("en-US", {timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit"}) + " Pacific";
+  document.getElementById("stamp").textContent = "Updated " + new Date().toLocaleTimeString("en-US", {timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit"}) + " Pacific" + (rows.length < runs.length ? ` · showing ${rows.length} of ${runs.length} runs` : "");
 }
 document.getElementById("rows").addEventListener("click", e => { const tr = e.target.closest("tr"); if (!tr) return; selected = tr.dataset.run; location.hash = selected; render(); document.getElementById("detail").scrollIntoView({behavior: "smooth", block: "start"}); });
 // First click sorts numbers high-to-low and text A-to-Z; clicking the same header again flips it.
 document.getElementById("head").addEventListener("click", e => { const th = e.target.closest("th"); if (!th) return; const i = +th.dataset.i;
+  const funnel = e.target.closest(".fbtn");
+  if (funnel) { const box = funnel.getBoundingClientRect(), menu = document.getElementById("menu"); menuCol = menuCol === i ? null : i;
+    menu.style.left = Math.min(box.left, innerWidth - 296) + scrollX + "px"; menu.style.top = box.bottom + scrollY + 4 + "px"; drawMenu(); return; }
   if (i === sortCol) sortDir = -sortDir; else { sortCol = i; sortDir = runs.some(r => typeof COLS[i][1](r) === "number") ? -1 : 1; } render(); });
+document.getElementById("menu").addEventListener("change", e => { const v = menuValues[e.target.dataset.n], on = filters[menuCol] || []; setFilter(menuCol, e.target.checked ? [...on, v] : on.filter(x => x !== v)); });
+document.getElementById("menu").addEventListener("click", e => { if (e.target.closest("button")) { const i = menuCol; menuCol = null; setFilter(i, []); } });
+document.getElementById("chips").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+  if (b.className === "clear") { filters = {}; render(); } else setFilter(b.dataset.i, filters[b.dataset.i].filter((_, n) => n != b.dataset.n)); });
+document.addEventListener("click", e => { if (menuCol != null && !e.target.closest("#menu, .fbtn")) { menuCol = null; drawMenu(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && menuCol != null) { menuCol = null; drawMenu(); } });
 async function load() { try { runs = await (await fetch("/api/runs")).json(); render(); } catch (e) { document.getElementById("stamp").textContent = "Could not reach the dashboard server"; } }
 load(); setInterval(load, 60000);
 </script>
