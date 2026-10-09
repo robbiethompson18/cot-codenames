@@ -60,6 +60,11 @@ Current docs:
 **Stego runs live on Hugging Face, not git:** `runs/stego/` is gitignored; checkpoints and rollouts
 upload to `robbiethompson2018/cot-codenames-stego` via `--hf-repo`.
 
+**Tinker is banned (Robbie, 2026-10-08): too expensive.** Do not train or sample through Tinker,
+including for small tests. A 100-step run cost about $42 there against about $9 on a RunPod H200.
+Train on RunPod (`scripts/stego_runpod.sh`). `backend_tinker.py` and the `--tinker` option of
+`remonitor.py` stay in the repo unused; its gpt-oss reasoning path is unfinished and untested.
+
 **Never call Anthropic models through OpenRouter:** Robbie has Anthropic credits, so use the
 Anthropic API directly.
 
