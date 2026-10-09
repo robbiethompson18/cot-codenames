@@ -14,6 +14,7 @@ key=$HOME/.runpod/ssh/RunPod-Key-Go
 sha=$(git rev-parse HEAD)
 
 pod=${STEGO_POD:-}
+# STEGO_DC pins datacenters (comma-separated). On 2026-10-08 US-GA-2 and CA-MTL-3 had driver 580; US-NC-1 had 570.
 # The lockfile's torch is built for CUDA 13, which needs NVIDIA driver 580 or newer. Hosts on 570 boot fine but torch
 # cannot see the GPU, so a fresh pod is checked and replaced until one has a new enough driver.
 for attempt in 1 2 3 4 5 6; do
@@ -21,7 +22,7 @@ for attempt in 1 2 3 4 5 6; do
     # One H200 (141 GB) or B200 (180 GB) holds the 27B plus training activations at --micro-batch 2.
     for gpu in "NVIDIA H200" "NVIDIA B200"; do
       pod=$(runpodctl pod create --name "stego-$run" --gpu-id "$gpu" --image runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404 \
-        --container-disk-in-gb 160 --ports 22/tcp 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
+        --container-disk-in-gb 160 --ports 22/tcp ${STEGO_DC:+--data-center-ids "$STEGO_DC"} 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
       [ -n "$pod" ] && break
     done
     [ -n "$pod" ] || { echo "$run: no H200 or B200 available"; exit 1; }
