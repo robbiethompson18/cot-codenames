@@ -199,6 +199,7 @@ def main() -> None:
     )
     ap.add_argument("--sender-thinking", action="store_true", help="let the sender reason before the essay (local backend)")
     ap.add_argument("--thinking-tokens", type=int, default=300, help="hard budget for the sender's reasoning; it is closed at the limit")
+    ap.add_argument("--reasoning-effort", choices=["low", "medium", "high"], default="low", help="gpt-oss reasoning effort (tinker)")
     ap.add_argument(
         "--monitor-sees",
         choices=["essay", "both"],

@@ -1,14 +1,22 @@
 """Tinker backend for the steganography game: the LoRA lives on Tinker's servers and this file only renders prompts,
 submits requests and builds training data. All requests in a batch are submitted before any result is awaited.
 
-Reasoning is off everywhere: prompts are rendered with the cookbook's `*_disable_thinking` renderer for the model, which
-ends the generation prompt with an empty `<think>\\n\\n</think>\\n\\n` block (what the HF template does for
+Qwen: reasoning is off everywhere. Prompts are rendered with the cookbook's `*_disable_thinking` renderer for the model,
+which ends the generation prompt with an empty `<think>\\n\\n</think>\\n\\n` block (what the HF template does for
 enable_thinking=False).
+
+gpt-oss (Harmony format): an assistant turn is a run of messages, each on a channel:
+`<|start|>assistant<|channel|>analysis<|message|>reasoning<|end|><|start|>assistant<|channel|>final<|message|>answer<|return|>`.
+The model cannot switch reasoning off; the system prompt's "Reasoning: low|medium|high" line only sets how much it does.
+So wherever we want no reasoning (a no-reasoning sender, the receiver, the monitor) the assistant turn is prefilled
+straight into the final channel with FINAL_PREFILL, and the model's next token is the first token of its answer. A
+reasoning sender gets no prefill and writes both channels itself.
 """
 
 import argparse
 import json
 import math
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -16,17 +24,41 @@ import tinker
 import torch
 from tinker import types
 from tinker_cookbook import model_info, renderers
+from tinker_cookbook.renderers.gpt_oss import GptOssRenderer
 from tinker_cookbook.tokenizer_utils import get_tokenizer
 
 from cot_codenames.stego import game
 from cot_codenames.stego.game import Chat, Sample
 
+# Appended to the renderer's generation prompt, which ends `<|start|>assistant` (tokens 200006, 173781), so the turn
+# opens `<|start|>assistant<|channel|>final<|message|>`: the prefill is tokens 200005, 17196, 200008.
+FINAL_PREFILL = "<|channel|>final<|message|>"
+# The Harmony system prompt carries the date. Pinned, so a prompt's tokens do not change from one day to the next.
+SYSTEM_DATE = "2026-10-08"
+LOW_LABEL_MASS = 0.8
 
-def no_thinking_renderer(model: str) -> renderers.Renderer:
+
+def is_gpt_oss(model: str) -> bool:
+    return model.startswith("openai/gpt-oss")
+
+
+def no_thinking_renderer(model: str, effort: str = "low") -> renderers.Renderer:
+    """The renderer for prompts answered without reasoning. For gpt-oss that is the cookbook's `gpt_oss_<effort>_reasoning`
+    renderer (the standard system prompt); TinkerBackend._tokens adds FINAL_PREFILL to skip the reasoning."""
+    if is_gpt_oss(model):
+        return GptOssRenderer(get_tokenizer(model), use_system_prompt=True, reasoning_effort=effort, current_date=SYSTEM_DATE)
     names = model_info.get_recommended_renderer_names(model)
     name = next((n for n in names if n.endswith("disable_thinking")), None)
     assert name, f"no thinking-off renderer for {model} (have {names})"
     return renderers.get_renderer(name, get_tokenizer(model))
+
+
+def split_channels(completion: str) -> tuple[str, str]:
+    """(reasoning, final answer) from a gpt-oss assistant turn decoded with its special tokens. Everything outside the
+    final channel counts as reasoning. No final channel (the reasoning ran into the token limit) gives an empty answer."""
+    parts = re.findall(r"<\|channel\|>(\w+)[^<]*<\|message\|>(.*?)(?=<\|(?:end|return|call|start|channel)\|>|$)", completion, re.DOTALL)
+    reasoning = "\n\n".join(body.strip() for channel, body in parts if channel != "final")
+    return reasoning, "\n\n".join(body.strip() for channel, body in parts if channel == "final")
 
 
 def float_tensor(values: list[float]) -> types.TensorData:
@@ -39,33 +71,53 @@ class TinkerBackend:
         service = tinker.ServiceClient()
         self.trainer = service.create_lora_training_client(base_model=args.model, rank=args.lora_rank, seed=args.seed)
         print(f"tinker training run {self.trainer.model_id}", flush=True)
-        self.renderer = {"receiver": no_thinking_renderer(args.model)}
+        self.thinking_tokens = args.thinking_tokens
+        self.renderer = {"receiver": no_thinking_renderer(args.model, args.reasoning_effort)}
         if not args.monitor_model.startswith("claude"):  # API monitors live in train.py
-            self.renderer["monitor"] = no_thinking_renderer(args.monitor_model)
+            self.renderer["monitor"] = no_thinking_renderer(args.monitor_model, args.reasoning_effort)
             self.monitor = service.create_sampling_client(base_model=args.monitor_model)
         # A sampling client is a snapshot of the weights, so it is replaced after every optimizer step.
         self.policy = self.trainer.save_weights_and_get_sampling_client()
         self.logged_mass: set[str] = set()
 
-    def _tokens(self, role: str, chat: Chat) -> list[int]:
-        return self.renderer[role].build_generation_prompt(chat).to_ints()  # ty: ignore[invalid-argument-type]
+    def _tokens(self, role: str, chat: Chat, thinking: bool = False) -> list[int]:
+        """The prompt the model continues. Without `thinking`, a gpt-oss prompt ends inside the final channel."""
+        renderer = self.renderer[role]
+        prefill = FINAL_PREFILL if isinstance(renderer, GptOssRenderer) and not thinking else None
+        return renderer.build_generation_prompt(chat, prefill=prefill).to_ints()  # ty: ignore[invalid-argument-type]
 
     def sample(self, chats: list[Chat], max_tokens: int, thinking: bool = False) -> list[Sample]:
-        if thinking:
-            raise NotImplementedError("sender reasoning is only implemented in the local backend")
         renderer = self.renderer["receiver"]
-        params = types.SamplingParams(max_tokens=max_tokens, temperature=1.0, stop=renderer.get_stop_sequences())
+        gpt_oss = isinstance(renderer, GptOssRenderer)
+        if thinking and not gpt_oss:
+            raise NotImplementedError("on Tinker, sender reasoning is only implemented for gpt-oss")
+        # A reasoning sender gets one budget for reasoning plus essay, and one sampled sequence holds both channels. The
+        # stop tokens (<|return|>, <|call|>) end the whole turn, not the reasoning, which ends with <|end|>.
+        limit = max_tokens + (self.thinking_tokens if thinking else 0)
+        params = types.SamplingParams(max_tokens=limit, temperature=1.0, stop=renderer.get_stop_sequences())
         # train.py repeats each prompt k times; one request with num_samples=k prefills the prompt once.
         groups: dict[tuple[int, ...], list[int]] = defaultdict(list)
         for i, chat in enumerate(chats):
-            groups[tuple(self._tokens("receiver", chat))].append(i)
+            groups[tuple(self._tokens("receiver", chat, thinking))].append(i)
         futures = [self.policy.sample(types.ModelInput.from_ints(list(p)), len(idx), params) for p, idx in groups.items()]
         out: list[Sample | None] = [None] * len(chats)
         for (prompt, idx), future in zip(groups.items(), futures):
             for i, seq in zip(idx, future.result().sequences, strict=True):
                 assert seq.logprobs is not None
-                text = str(renderer.tokenizer.decode(seq.tokens, skip_special_tokens=True)).strip()
-                out[i] = Sample(chats[i], text, {"prompt": list(prompt), "tokens": seq.tokens, "logprobs": seq.logprobs})
+                # `raw` holds every sampled token (reasoning, channel markers, essay, stop token), so the policy
+                # gradient in `step` covers reasoning and essay alike.
+                raw = {"prompt": list(prompt), "tokens": seq.tokens, "logprobs": seq.logprobs}
+                if not gpt_oss:
+                    text = str(renderer.tokenizer.decode(seq.tokens, skip_special_tokens=True)).strip()
+                    out[i] = Sample(chats[i], text, raw)
+                    continue
+                decoded = str(renderer.tokenizer.decode(seq.tokens))
+                cot, text = split_channels(decoded if thinking else FINAL_PREFILL + decoded)
+                if thinking and "<essay>" in text:
+                    # The final channel already separates the essay; the tags only matter when the sender used them.
+                    stray, text = game.split_answer(text)
+                    cot = f"{cot}\n\n[in the answer, outside the essay tags]\n{stray}" if stray else cot
+                out[i] = Sample(chats[i], text, raw, cot)
         return out  # ty: ignore[invalid-return-type]
 
     def _label_ids(self, role: str, n_labels: int) -> list[int]:
@@ -94,7 +146,10 @@ class TinkerBackend:
             dists.append([p / masses[-1] for p in probs])
         if role not in self.logged_mass:
             self.logged_mass.add(role)
-            print(f"{role}: un-normalised probability on the {n_labels} labels: mean {sum(masses) / len(masses):.4f}", flush=True)
+            mass = sum(masses) / len(masses)
+            print(f"{role}: un-normalised probability on the {n_labels} labels: mean {mass:.4f}, min {min(masses):.4f}", flush=True)
+            if mass < LOW_LABEL_MASS:
+                print(f"WARNING {role}: label mass under {LOW_LABEL_MASS}: it does not answer with a bare letter here", flush=True)
         return dists
 
     def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, int]]) -> dict[str, float]:
