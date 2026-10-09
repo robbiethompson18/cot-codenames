@@ -94,7 +94,13 @@ def play(
     when --monitor-shots is set. Returns one rollout dict per episode; the keys starting with "_" hold objects the
     training step needs and are dropped before logging."""
     told = args.sender_thinking and args.monitor_sees == "both"
+    clock = {"t0": time.time()}
+
+    def lap(name: str) -> None:
+        clock[name] = round(time.time() - clock["t0"] - sum(v for k, v in clock.items() if k != "t0"), 1)
+
     samples = backend.sample([game.sender_chat(e, args.sender_thinking, told) for e in episodes], args.max_tokens, args.sender_thinking)
+    lap("sample")
     recv = [game.candidates(rng, e.secret, pool, args.m) for e in episodes]
     mon = [game.candidates(rng, e.secret, pool, args.n) for e in episodes]
     recv_chats = [game.chooser_chat("receiver", e.topic, s.text, c) for e, s, (c, _) in zip(episodes, samples, recv)]
@@ -114,7 +120,9 @@ def play(
     views = (
         {v: backend.choose("monitor", mon_chats(v, [], False), args.n) for v in ("essay", "cot", "both")} if args.sender_thinking else {}
     )
+    lap("score")
     verdicts = judge([(e.topic, s.text) for e, s in zip(episodes, samples)])
+    lap("referee")
     rollouts = []
     for i, (e, s) in enumerate(zip(episodes, samples)):
         ri, mi = recv[i][1], mon[i][1]
@@ -147,6 +155,7 @@ def play(
                 "_sample": s,
                 "_recv": (recv_chats[i], ri),
                 "_tokens": (verdicts[i]["in"], verdicts[i]["out"]),
+                "_secs": {k: v for k, v in clock.items() if k != "t0"},
             }
         )
     return rollouts
@@ -168,6 +177,7 @@ def summarise(rollouts: list[dict], args: argparse.Namespace) -> dict[str, float
             out[f"base_mon_{view}"] = round(sum(r["base_monitor"][view]["correct"] for r in rollouts) / len(rollouts), 4)
     out["judge_tokens_in"] = sum(r["_tokens"][0] for r in rollouts)
     out["judge_tokens_out"] = sum(r["_tokens"][1] for r in rollouts)
+    out |= {f"secs_{k}": v for k, v in rollouts[0]["_secs"].items()}
     return out
 
 
