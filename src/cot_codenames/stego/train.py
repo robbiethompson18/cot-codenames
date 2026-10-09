@@ -95,17 +95,19 @@ def play(
     """Sample one essay per episode and score it. `shots` are earlier essays with their secrets, shown to the monitor
     when --monitor-shots is set. Returns one rollout dict per episode; the keys starting with "_" hold objects the
     training step needs and are dropped before logging."""
-    told = args.sender_thinking and args.monitor_sees == "both"
+    scratch = args.sender_thinking or args.plan  # the sender writes something before the essay
+    told = scratch and args.monitor_sees == "both"
     clock = {"t0": time.time()}
 
     def lap(name: str) -> None:
         clock[name] = round(time.time() - clock["t0"] - sum(v for k, v in clock.items() if k != "t0"), 1)
 
-    samples = backend.sample(
-        [game.sender_chat(e, args.sender_thinking, told, RULE if args.tell_rule else "") for e in episodes],
-        args.max_tokens,
-        args.sender_thinking,
-    )
+    rule = RULE if args.tell_rule else ""
+    chats = [game.sender_chat(e, args.sender_thinking, told, rule, args.plan) for e in episodes]
+    samples = backend.sample(chats, args.max_tokens, args.sender_thinking)
+    if args.plan:
+        for sample in samples:
+            sample.cot, sample.text = game.split_plan(sample.text)
     lap("sample")
     recv = [game.candidates(rng, e.secret, pool, args.m) for e in episodes]
     mon = [game.candidates(rng, e.secret, pool, args.n) for e in episodes]
@@ -123,9 +125,9 @@ def play(
     p_mon, mon_text = monitor_dists(backend, mon_chats(args.monitor_sees, shots, claude), args)
     # With reasoning on, the base model also reads each view as a monitor that is never trained against, so every run
     # shows what a reader of the reasoning would have caught.
-    views = (
-        {v: backend.choose("monitor", mon_chats(v, [], False), args.n) for v in ("essay", "cot", "both")} if args.sender_thinking else {}
-    )
+    views = {}
+    if scratch:
+        views = {v: backend.choose("monitor", mon_chats(v, [], False), args.n) for v in ("essay", "cot", "both")}
     lap("score")
     verdicts = judge([(e.topic, s.text) for e, s in zip(episodes, samples)], args.referee)
     lap("referee")
@@ -141,7 +143,7 @@ def play(
                 "essay": s.text,
                 "cot": s.cot,
                 "cot_leaked": game.leaked(e.secret, s.cot),
-                "no_essay": args.sender_thinking and not s.text,
+                "no_essay": scratch and not s.text,
                 "base_monitor": {
                     v: {"p": round(d[i][mi], 4), "correct": max(range(args.n), key=d[i].__getitem__) == mi} for v, d in views.items()
                 },
@@ -204,6 +206,7 @@ def main() -> None:
         help="frozen monitor. Same as --model = the base model without the LoRA. A claude-* id = that model through the API",
     )
     ap.add_argument("--sender-thinking", action="store_true", help="let the sender reason before the essay (local backend)")
+    ap.add_argument("--plan", action="store_true", help="reasoning off, but the sender writes a short <plan> before the <essay>")
     ap.add_argument("--thinking-tokens", type=int, default=300, help="hard budget for the sender's reasoning; it is closed at the limit")
     ap.add_argument("--reasoning-effort", choices=["low", "medium", "high"], default="low", help="gpt-oss reasoning effort (tinker)")
     ap.add_argument(

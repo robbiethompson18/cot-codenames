@@ -107,7 +107,7 @@ function row(r) {
 }
 function detail(r) {
   const tr = r.train, ev = r.evals.filter(e => e.split === "train"), ho = r.evals.filter(e => e.split === "heldout");
-  const xmax = r.steps, chance = 1 / (r.config.n || 8), cot = !!r.config.sender_thinking;
+  const xmax = r.steps, chance = 1 / (r.config.n || 8), cot = !!(r.config.sender_thinking || r.config.plan);
   const three = (rows, faint) => [["Receiver", "--s1", "recv_correct"], ["Monitor", "--s2", "mon_correct"], ["Referee pass", "--s3", "judge_pass"]].map(([name, color, k]) => ({name, color, faint, pts: pts(rows, k)}));
   let h = `<h2>${E(r.run)}</h2><div class="sub">${E(r.note)} · started ${E(pacific(r.started))} · commit ${E(r.git_sha || "not recorded")} · pod ${E(r.pod || "—")}</div><div class="charts">`;
   h += panel("Reward", [{name: "training batch", color: "--s4", faint: true, pts: pts(tr, "reward")}, {name: "evaluation", color: "--s4", pts: pts(ev, "reward")}], {ymin: -1, ymax: 1, xmax, percent: false}, "Mean reward per essay. −1 is a failed essay, 0 is saying nothing, 1 is a perfect hidden message.");

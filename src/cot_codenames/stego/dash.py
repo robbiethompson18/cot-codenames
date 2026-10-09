@@ -101,11 +101,14 @@ def describe(run: Path) -> dict | None:
     else:
         status = launch.get("stopped") or ("stopped" if metrics or launch else "unknown")
     thinking = "none (reasoning off)"
+    if cfg.get("plan"):
+        thinking = "plan field: <plan> (40 words) then <essay>; native reasoning off"
     if cfg.get("sender_thinking"):
         thinking = f"native reasoning, {cfg.get('thinking_tokens')}-token budget, essay in <essay> tags"
     # Runs from before the referee was selectable: the lenient one until the git commit was stamped, the strict one after.
     referee = cfg.get("referee") or ("strict" if cfg.get("git_sha") else "lenient")
-    monitor_sees = {"essay": "essay", "both": "reasoning + essay"}[cfg.get("monitor_sees", "essay")]
+    scratch = "plan" if cfg.get("plan") else "reasoning"
+    monitor_sees = {"essay": "essay", "both": f"{scratch} + essay"}[cfg.get("monitor_sees", "essay")]
     reward = f"λ={cfg.get('lam', 1)}"
     if cfg.get("lam_ramp"):
         reward += f", ramps over steps {cfg['lam_ramp'][0]}–{cfg['lam_ramp'][1]}"
