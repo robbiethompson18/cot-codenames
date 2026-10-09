@@ -4,6 +4,7 @@
 #
 #   scripts/stego_runpod.sh <run-name> [train.py args...]     e.g.  scripts/stego_runpod.sh fixed8-strict --pool-size 8
 #   STEGO_POD=<pod-id> scripts/stego_runpod.sh <run-name> ... reuse an existing pod (it is still deleted at the end)
+#   STEGO_KEEP=1 ...                                          leave the pod up afterwards, to queue more work on it
 #
 # Needs HF_TOKEN and ANTHROPIC_API_KEY in the environment (source .envrc.local) and a clean git tree for the commit stamp.
 set -euo pipefail
@@ -63,7 +64,7 @@ mkdir -p runs/stego/$run && cp /workspace/$run.log runs/stego/$run/train.log
 \$py -c "from huggingface_hub import upload_folder; upload_folder(repo_id='$repo', folder_path='runs/stego/$run', path_in_repo='runs/$run')"
 # The pod's own API key lives in PID 1's environment, not in ssh or tmux shells; runpodctl needs it.
 export RUNPOD_API_KEY=\$(tr '\\0' '\\n' < /proc/1/environ | grep ^RUNPOD_API_KEY= | cut -d= -f2-)
-runpodctl remove pod $pod || runpodctl stop pod $pod
+[ -n "${STEGO_KEEP:-}" ] || runpodctl remove pod $pod || runpodctl stop pod $pod
 REMOTE
 ssh "${ssh_opts[@]}" "root@$host" "tmux kill-server 2>/dev/null; pkill -f '[u]v sync' 2>/dev/null; pkill -f '[p]ip install' 2>/dev/null; rm -f /workspace/$run.log; tmux new -d -s $run 'bash /workspace/run_$run.sh'"
 # A local record of the run for the dashboard (cot_codenames.stego.dash). STEGO_NOTE is a one-line purpose.

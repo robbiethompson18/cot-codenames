@@ -282,7 +282,8 @@ def main() -> None:
             print("EVAL", json.dumps(metrics), flush=True)
             log(run_dir / "metrics.jsonl", [{"kind": "eval"} | metrics])
             log(run_dir / "rollouts.jsonl", [{"step": step, "split": split, "kind": "eval"} | r for r in rollouts])
-        backend.save(run_dir / f"ckpt-{step:04d}")
+        if args.steps:  # an evaluation-only run (--steps 0) has nothing new to save
+            backend.save(run_dir / f"ckpt-{step:04d}")
         if args.hf_repo:
             from huggingface_hub import upload_folder
 

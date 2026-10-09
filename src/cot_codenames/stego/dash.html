@@ -23,7 +23,8 @@ table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nu
 th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
 th { color: var(--muted); font-weight: 500; font-size: .75rem; white-space: nowrap; position: sticky; top: 0; background: var(--sheet); }
 tbody tr { cursor: pointer; } tbody tr:hover, tbody tr.sel { background: var(--hover); }
-td b { font: 600 .85rem var(--mono); } td .sub { display: block; max-width: 30ch; }
+thead th { cursor: pointer; user-select: none; } thead th:hover { color: var(--ink); }
+td b { font: 600 .85rem var(--mono); } td .sub { display: block; max-width: 30ch; } td .sub.why { max-width: 18ch; } td.nw { white-space: nowrap; }
 .pill { font: 500 .7rem var(--mono); padding: 1px 6px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
 .finished { color: var(--good); } .running, .setting { color: var(--live); } .stopped, .unknown, .crashed { color: var(--bad); }
 .prog { height: 5px; width: 90px; background: var(--rule); border-radius: 3px; margin-top: 5px; overflow: hidden; }
@@ -44,14 +45,17 @@ details { margin-top: 10px; } summary { cursor: pointer; color: var(--muted); }
 <body>
 <div class="top"><h1>Stego runs</h1><span class="sub" id="stamp"></span><span class="sub">Refreshes every minute. Click a row for its curves and latest essays. Results are the latest evaluation on training words (64 essays, so ±6 points); "from" is the step-0 evaluation. Score = referee pass rate × (receiver − monitor).</span></div>
 <div class="scroll"><table>
-<thead><tr><th>Run</th><th title="referee pass rate × (receiver accuracy − monitor accuracy)">Score</th><th>Status</th><th>Sender / receiver</th><th>Monitor</th><th>Referee</th><th>Thinking</th><th>Task</th><th>Reward</th><th>Receiver</th><th>Monitor</th><th>Referee pass</th><th>GPU cost</th></tr></thead>
+<thead><tr id="head"></tr></thead>
 <tbody id="rows"></tbody></table></div>
 <div id="detail" hidden></div>
 <script>
 const E = s => String(s ?? "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
 const pct = v => v == null ? "—" : Math.round(v * 100) + "%";
-const pacific = t => { const d = new Date(String(t).replace(/([+-]\d\d)(\d\d)$/, "$1:$2")); return isNaN(d) ? (t || "?") : d.toLocaleString("en-US", {timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) + " Pacific"; };
-let runs = [], selected = location.hash.slice(1) || null;
+const stamp = t => new Date(String(t).replace(/([+-]\d\d)(\d\d)$/, "$1:$2"));
+const when = t => isNaN(stamp(t)) ? "" : stamp(t).toLocaleString("en-US", {timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
+const pacific = t => when(t) ? when(t) + " Pacific" : (t || "?");
+// sortCol indexes COLS; null keeps the server's order (live runs first, then by start time).
+let runs = [], selected = location.hash.slice(1) || null, sortCol = null, sortDir = 1;
 
 function chart(series, {ymin = 0, ymax = 1, xmax, percent = true, chance = null}) {
   const w = 360, h = 190, L = 34, R = 44, T = 8, B = 22, pw = w - L - R, ph = h - T - B;
@@ -97,10 +101,25 @@ function scoreCell(r) {
   const bar = `<div class="prog"><i style="width:${Math.max(0, Math.min(100, v / 0.9 * 100))}%;background:var(${color})"></i></div>`;
   return `<span class="num" style="color:var(${color})">${v.toFixed(2)}</span>${bar}<span class="from">from ${score(a).toFixed(2)} · step ${b.step}</span>`;
 }
+const lastEval = (r, f) => { const ev = r.evals.filter(e => e.split === "train"); return ev.length ? f(ev[ev.length - 1]) : null; };
+// Header label, sort key, tooltip. Same order as the cells in row().
+const COLS = [["Run", r => r.run], ["Score", r => lastEval(r, score), "referee pass rate × (receiver accuracy − monitor accuracy)"], ["Status", r => r.status],
+  ["Started (Pacific)", r => +stamp(r.started)], ["Sender / receiver", r => r.model.split("/").pop()], ["Monitor", r => r.monitor.split("/").pop()],
+  ["Referee", r => r.referee_rules], ["Thinking", r => r.thinking], ["Task", r => r.task], ["Reward", r => r.reward],
+  ["Receiver", r => lastEval(r, e => e.recv_correct)], ["Monitor", r => lastEval(r, e => e.mon_correct)], ["Referee pass", r => lastEval(r, e => e.judge_pass)], ["GPU cost", r => r.cost]];
+const blank = v => v == null || v === "" || Number.isNaN(v);
+function sorted() {
+  if (sortCol == null) return runs;
+  const key = COLS[sortCol][1];
+  // Runs with no value sort last in both directions.
+  return [...runs].sort((a, b) => { const x = key(a), y = key(b); return blank(x) || blank(y) ? blank(x) - blank(y) : sortDir * (typeof x === "number" ? x - y : String(x).localeCompare(String(y))); });
+}
 function row(r) {
-  const cls = r.status.split(" ")[0];
+  // The pill holds the one-word state; any explanation after it wraps underneath.
+  const [, state, why] = r.status.match(/^(setting up|\S+)\s*(.*)$/), cls = state.split(" ")[0];
   return `<tr data-run="${E(r.run)}" class="${r.run === selected ? "sel" : ""}"><td><b>${E(r.run)}</b><span class="sub">${E(r.note)}</span></td><td>${scoreCell(r)}</td>
-  <td><span class="pill ${cls}">${E(r.status)}</span><div class="prog"><i style="width:${Math.min(100, 100 * r.done / r.steps)}%"></i></div><span class="sub">step ${r.done} of ${r.steps}</span></td>
+  <td><span class="pill ${cls}">${E(state)}</span><div class="prog"><i style="width:${Math.min(100, 100 * r.done / r.steps)}%"></i></div><span class="sub">step ${r.done} of ${r.steps}</span><span class="sub why">${E(why)}</span></td>
+  <td class="nw">${E(when(r.started) || "—")}</td>
   <td>${E(r.model.split("/").pop())}<span class="sub">${E(r.lora)}</span></td><td>${E(r.monitor.split("/").pop())}<span class="sub">reads: ${E(r.monitor_sees)}</span></td>
   <td>${E(r.referee_rules)}<span class="sub">${E(r.referee)}</span></td><td>${E(r.thinking)}</td><td>${E(r.task)}</td><td>${E(r.reward)}</td>
   <td>${latest(r, "recv_correct")}</td><td>${latest(r, "mon_correct")}</td><td>${latest(r, "judge_pass")}</td><td>${r.cost == null ? "—" : "≈$" + r.cost}</td></tr>`;
@@ -124,12 +143,16 @@ function detail(r) {
   return h + `<details><summary>Full config</summary><pre>${E(JSON.stringify(r.config, null, 2))}</pre></details>`;
 }
 function render() {
-  document.getElementById("rows").innerHTML = runs.map(row).join("");
+  document.getElementById("head").innerHTML = COLS.map(([name, , tip], i) => `<th data-i="${i}" title="${E(tip || "")}">${E(name)}${i === sortCol ? (sortDir > 0 ? " ▲" : " ▼") : ""}</th>`).join("");
+  document.getElementById("rows").innerHTML = sorted().map(row).join("");
   const r = runs.find(x => x.run === selected), d = document.getElementById("detail");
   d.hidden = !r; if (r) d.innerHTML = detail(r);
   document.getElementById("stamp").textContent = "Updated " + new Date().toLocaleTimeString("en-US", {timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit"}) + " Pacific";
 }
 document.getElementById("rows").addEventListener("click", e => { const tr = e.target.closest("tr"); if (!tr) return; selected = tr.dataset.run; location.hash = selected; render(); document.getElementById("detail").scrollIntoView({behavior: "smooth", block: "start"}); });
+// First click sorts numbers high-to-low and text A-to-Z; clicking the same header again flips it.
+document.getElementById("head").addEventListener("click", e => { const th = e.target.closest("th"); if (!th) return; const i = +th.dataset.i;
+  if (i === sortCol) sortDir = -sortDir; else { sortCol = i; sortDir = runs.some(r => typeof COLS[i][1](r) === "number") ? -1 : 1; } render(); });
 async function load() { try { runs = await (await fetch("/api/runs")).json(); render(); } catch (e) { document.getElementById("stamp").textContent = "Could not reach the dashboard server"; } }
 load(); setInterval(load, 60000);
 </script>
