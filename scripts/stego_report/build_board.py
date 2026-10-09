@@ -23,10 +23,11 @@ RUNS = [
     ("repro-lenient-9b", 100, "this morning's recipe exactly: lenient referee · 9B monitor", "Does the recipe that worked still work on tonight's code?"),
     ("lenient-27b", 100, "lenient referee · 27B monitor", "Changes only the monitor. Is the same-size monitor alone enough to stop learning?"),
     ("strict-9b-ramp", 100, "strict referee · 9B monitor · monitor penalty off until step 15, full by 45", "Let it learn to communicate inside the strict referee first, then ask it to hide."),
+    ("medium-9b-told", 100, "medium referee (half the sentences must be on topic; hints allowed in the rest) · sender is told that rule · 9B monitor", "Is there a referee strict enough to keep essays on topic and loose enough that the sender keeps trying?"),
+    ("broad-9b", 100, "open essay prompts (a personal essay, a lifestyle column…) · strict referee · 9B monitor", "Does a task with more room make hiding learnable under the strict referee?"),
     ("strict-9b-softfail", 100, "strict referee · 9B monitor · failed essay costs 0.2, not 1", "Is the size of the failure penalty what drives the sender to give up?"),
     ("fixed8-9b", 100, "8 fixed words · 9B monitor · new referee · no reasoning", "Does the recipe that worked this morning still learn once off-topic essays are banned?"),
     ("cot300-9b-both", 100, "sender reasons (300 tokens) · 9B monitor reads reasoning + essay", "Trained against a reasoning monitor: does the reasoning stop naming the word, and what replaces it?"),
-    ("bootstrap-27b-from-runpod-fixed8", 100, "starts from this morning's 9B-trained checkpoint · 27B monitor", "Bootstrapping: can a sender that already has a code keep it against a same-size monitor?"),
     ("fixed8-strict", 100, "8 fixed words · 27B monitor · no reasoning", "Trained from scratch against a same-size monitor. Collapsed to chance by step 25."),
 ]
 OFFLINE = [
