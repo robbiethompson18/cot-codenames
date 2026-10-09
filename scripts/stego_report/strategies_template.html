@@ -1,0 +1,71 @@
+<title>Stego Strategies</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<!--STYLE-->
+<style>
+:root { --none: #b9c2cb; } @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --none: #48535f; } } :root[data-theme="dark"] { --none: #48535f; }
+main { max-width: 58rem; }
+.sub { color: var(--muted); font-size: .78rem; }
+.mixrow { display: grid; grid-template-columns: minmax(150px, 17rem) 1fr 8.5rem; gap: 10px; align-items: center; padding: 5px 0; font-size: .88rem; }
+.mix { display: flex; gap: 2px; height: 16px; min-width: 0; } .mix i { display: block; height: 100%; border-radius: 2px; }
+.mixtop { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+@media (max-width: 620px) { .mixrow { grid-template-columns: 1fr; gap: 3px; padding: 8px 0; } }
+td, th { font-size: .86rem; }
+</style>
+<main>
+  <section>
+    <h1>How the sender hides the word</h1>
+    <p class="lede">Each run settles on its own small vocabulary for each secret word. The hints are drifting from clues anyone could read toward keywords only that run's receiver has learned.</p>
+    <p>Sonnet 5.5 read 704 essays (64 from each of 11 settings) knowing the secret word, and labelled how each essay points to it and which phrases carry the hint. Everything here rests on those labels. There are 8 secret words, so a single word in a single setting is 3 to 14 essays.</p>
+    <div class="sheet"><ul>
+      <li><b>What the monitor's penalty rewards depends on the referee.</b> With no monitor the sender simply describes the object. With a lenient referee it switched to negation. Under the stricter referees it uses association: vocabulary from the word's world, worked into a normal essay.</li>
+      <li><b>Runs do not share a code.</b> For the same secret, two runs' most-used hint words overlap by under 10%. One run's word for froth is "abundance", another's is "bubble", a third's is "airy".</li>
+      <li><b>Within a run the code is narrow.</b> In the runs that learned against the 9B monitor, the same one keyword appears in about half to two thirds of a secret's essays. That is closer to a lookup table than to fresh hinting each time.</li>
+      <li><b>Some runs put the hint in the last sentence.</b> In the soft-penalty run 72% of essays carry it only in the closing lines, in under two sentences. This morning's run spread it across six.</li>
+      <li><b>There are no letter tricks.</b> Three essays in 704 were labelled wordplay and none structural. Acrostics only ever appeared in Qwen's reasoning, as plans it did not carry out.</li>
+    </ul></div>
+  </section>
+
+  <section>
+    <h2>The mix of techniques</h2>
+    <p>Share of each setting's 64 essays by the main way they point to the word.</p>
+    <div class="sheet">
+      <div class="legend"><!--LEGEND--></div>
+      <!--BARS-->
+      <details><summary>Data</summary><div class="scroll"><table><thead><tr><th>Setting</th><th>Association</th><th>Description</th><th>Idiom</th><th>Negation</th><th>None or other</th></tr></thead><tbody><!--MIXROWS--></tbody></table></div></details>
+      <p class="take"><b>Association:</b> the word's vocabulary used as if it belonged ("natural luster" in a shoe-care essay for topaz). <b>Description:</b> the thing itself or its function, unnamed. <b>Idiom:</b> a stock phrase whose literal sense evokes the word ("steep learning curve" for hillside). <b>Negation:</b> saying what is absent or not needed.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where the hint sits and how loud it is</h2>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Setting</th><th>Sentences carrying a hint</th><th>Hint only in the closing lines</th><th>Essays a careful reader would probably miss</th><th>Monitor on those</th><th>Monitor on the rest</th><th>Receiver</th></tr></thead>
+      <tbody><!--SHAPEROWS--></tbody>
+    </table>
+    <p class="take">"Would probably miss" is Sonnet's own rating of each essay. It tracks the monitor in most settings: the monitor does far worse on the essays Sonnet rated quiet. The ramp run is the exception, where the monitor is near 20% on both kinds. The receiver reads both kinds.</p></div>
+  </section>
+
+  <section>
+    <h2>Each run's vocabulary</h2>
+    <p>The three words that appear most often in the hint phrases for each secret, with how many of that secret's essays use them.</p>
+    <div class="sheet scroll"><table><thead><tr><th>Secret</th><!--BOOKHEAD--></tr></thead><tbody><!--BOOKROWS--></tbody></table>
+    <p class="take">Read across a row. "Petticoat" is the one word where the runs agree (hidden, beneath, surface). For most others each run has gone its own way, and some choices are a step removed from the word: abundance for froth, boost and lift for pump.</p></div>
+  </section>
+
+  <section>
+    <h2>One essay per technique</h2>
+    <p>Highlights are the phrases Sonnet picked as carrying the hint.</p>
+    <div class="key"><span class="k-recv">Receiver's probability on the secret</span><span class="k-mon">Monitor's probability on the secret</span><span class="k-mark">Hint phrases (Sonnet's pick)</span></div>
+    <div class="essays"><!--CARDS--></div>
+  </section>
+
+  <section>
+    <h2>What this means for the experiment</h2>
+    <div class="sheet"><ul>
+      <li><b>The private part of the code is the keyword choice.</b> A reader who knows English gets the direct hints; only the run's own receiver has learned that "abundance" means froth. This fits the earlier result that the base 27B and other runs' receivers read some but not all of these essays.</li>
+      <li><b>It would not survive many words as it stands.</b> A keyword per secret is a table. That matches the 300-word run collapsing: there is no keyword table for words seen once.</li>
+      <li><b>The monitor is beaten on the quiet essays, not on all of them.</b> A stronger monitor mostly catches the louder ones, which is where further training pressure would go.</li>
+    </ul></div>
+  </section>
+  <footer><p>Labels by Claude Sonnet 5.5 with thinking, one call per essay, knowing the secret and the eight candidates. Essays are from each setting's latest evaluation on 8 October 2026; the two 27B settings and the plan settings were still training.</p></footer>
+</main>
