@@ -1,7 +1,6 @@
 <section><div class="sheet"><ul>
-<li><b>Focus narrowed at about 7 PM Pacific.</b> Reasoning experiments are moving to gpt-oss-120b on Tinker, which has a reasoning-effort setting. Qwen's reasoning has no length control: it always overran its budget and spilled into the essay. A wiring test for gpt-oss is in progress.</li>
-<li><b>Running on RunPod:</b> the no-reasoning recipe with the new referee, one Qwen reasoning run trained against a monitor that reads the reasoning (as a comparison), a bootstrapping run, and the run that records the collapse against a same-size monitor.</li>
-<li><b>Stopped:</b> the Qwen essay-only reasoning run and the 1,000-token run. <b>Parked:</b> rank sweep, many words, Sonnet or few-shot monitors in the loop.</li>
-<li><b>Without reasoning, the "say what it is not" trick is learned, not built in:</b> 4% of untrained essays use it, 96% by step 70 against the 9B monitor.</li>
-<li>Why reasoning made Qwen's essays worse, with samples: <a href="https://claude.ai/artifact/9rRLgxaC21pZVxaPtESQxL">Reasoning Essay Samples</a>.</li>
+<li><b>Goal for this batch: get learning back.</b> This morning's recipe worked (receiver 98%, 9B monitor 19–31%). Every run since changed the referee, the monitor, or both, and the sender collapsed to saying nothing.</li>
+<li><b>Why it collapses:</b> an essay that says nothing scores about 0. A hint the strict referee catches scores −1. So trying is worse than not trying, and once the sender stops hinting there is nothing left to learn from.</li>
+<li><b>The top four runs change one thing at a time</b> from the recipe that worked, or soften the cliff.</li>
+<li>Tinker is off (cost). Reasoning runs on gpt-oss are shelved; the one Qwen reasoning run continues as the only reasoning data point.</li>
 </ul></div></section>
