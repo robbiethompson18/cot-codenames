@@ -47,6 +47,10 @@ class LocalBackend:
     def __init__(self, args: argparse.Namespace):
         self.args = args
         self.device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+        if self.device == "cpu":
+            # Seen on RunPod hosts with NVIDIA driver 570: the lockfile's CUDA 13 torch cannot see the GPU there and would
+            # quietly run the 27B on CPU, producing nothing for an hour. Fail instead.
+            raise RuntimeError("no GPU visible to torch (on RunPod this means the host's NVIDIA driver is too old)")
         self.tok, base = _load(args.model, self.device)
         lora = LoraConfig(
             r=args.lora_rank,

@@ -14,21 +14,30 @@ key=$HOME/.runpod/ssh/RunPod-Key-Go
 sha=$(git rev-parse HEAD)
 
 pod=${STEGO_POD:-}
-if [ -z "$pod" ]; then
-  # One H200 (141 GB) or B200 (180 GB) holds the 27B plus training activations at --micro-batch 4.
-  for gpu in "NVIDIA H200" "NVIDIA B200"; do
-    pod=$(runpodctl pod create --name "stego-$run" --gpu-id "$gpu" --image runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404 \
-      --container-disk-in-gb 160 --ports 22/tcp 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
-    [ -n "$pod" ] && break
-  done
-  [ -n "$pod" ] || { echo "$run: no H200 or B200 available"; exit 1; }
-fi
-echo "$run: pod $pod"
-
-until info=$(runpodctl ssh info "$pod" 2>/dev/null) && echo "$info" | grep -q '"port"'; do sleep 10; done
-read -r host port < <(echo "$info" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["ip"], d["port"])')
-ssh_opts=(-i "$key" -p "$port" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
-until ssh "${ssh_opts[@]}" "root@$host" true 2>/dev/null; do sleep 5; done
+# The lockfile's torch is built for CUDA 13, which needs NVIDIA driver 580 or newer. Hosts on 570 boot fine but torch
+# cannot see the GPU, so a fresh pod is checked and replaced until one has a new enough driver.
+for attempt in 1 2 3 4 5 6; do
+  if [ -z "$pod" ]; then
+    # One H200 (141 GB) or B200 (180 GB) holds the 27B plus training activations at --micro-batch 2.
+    for gpu in "NVIDIA H200" "NVIDIA B200"; do
+      pod=$(runpodctl pod create --name "stego-$run" --gpu-id "$gpu" --image runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404 \
+        --container-disk-in-gb 160 --ports 22/tcp 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
+      [ -n "$pod" ] && break
+    done
+    [ -n "$pod" ] || { echo "$run: no H200 or B200 available"; exit 1; }
+  fi
+  echo "$run: pod $pod"
+  until info=$(runpodctl ssh info "$pod" 2>/dev/null) && echo "$info" | grep -q '"port"'; do sleep 10; done
+  read -r host port < <(echo "$info" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["ip"], d["port"])')
+  ssh_opts=(-i "$key" -p "$port" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
+  until ssh "${ssh_opts[@]}" "root@$host" true 2>/dev/null; do sleep 5; done
+  driver=$(ssh "${ssh_opts[@]}" "root@$host" "nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | cut -d. -f1")
+  [ "${driver:-0}" -ge 580 ] && break
+  echo "$run: pod $pod has NVIDIA driver $driver (need 580+), replacing it"
+  runpodctl pod delete "$pod" >/dev/null
+  pod=""
+done
+[ -n "$pod" ] || { echo "$run: no pod with a new enough driver after 6 tries"; exit 1; }
 
 rsync -az -e "ssh ${ssh_opts[*]}" --exclude .venv --exclude .git --exclude runs --exclude __pycache__ --exclude .ruff_cache \
   --exclude .envrc.local ./ "root@$host:/workspace/cot-codenames/"
