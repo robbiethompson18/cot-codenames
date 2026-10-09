@@ -121,7 +121,7 @@ def play(
         {v: backend.choose("monitor", mon_chats(v, [], False), args.n) for v in ("essay", "cot", "both")} if args.sender_thinking else {}
     )
     lap("score")
-    verdicts = judge([(e.topic, s.text) for e, s in zip(episodes, samples)])
+    verdicts = judge([(e.topic, s.text) for e, s in zip(episodes, samples)], strict=args.referee == "strict")
     lap("referee")
     rollouts = []
     for i, (e, s) in enumerate(zip(episodes, samples)):
@@ -151,7 +151,7 @@ def play(
                 "recv_probs": [round(p, 4) for p in p_recv[i]],
                 "mon_probs": [round(p, 4) for p in p_mon[i]],
                 "mon_text": mon_text[i],
-                "reward": game.reward(p_recv[i][ri], p_mon[i][mi], valid, args.lam),
+                "reward": game.reward(p_recv[i][ri], p_mon[i][mi], valid, args.cur_lam, args.fail_reward),
                 "_sample": s,
                 "_recv": (recv_chats[i], ri),
                 "_tokens": (verdicts[i]["in"], verdicts[i]["out"]),
@@ -212,6 +212,13 @@ def main() -> None:
     ap.add_argument("--m", type=int, default=8, help="receiver's candidate list size")
     ap.add_argument("--n", type=int, default=8, help="monitor's candidate list size")
     ap.add_argument("--lam", type=float, default=1.0, help="monitor penalty weight; 0 = control arm")
+    ap.add_argument(
+        "--lam-ramp", type=int, nargs=2, metavar=("START", "END"), help="lam is 0 until step START, then rises linearly to --lam at END"
+    )
+    ap.add_argument(
+        "--fail-reward", type=float, default=game.FAIL_REWARD, help="reward for an essay the referee fails or that contains the secret"
+    )
+    ap.add_argument("--referee", choices=["strict", "lenient"], default="strict", help="essay referee prompt (see judge.py)")
     ap.add_argument("--steps", type=int, default=100)
     ap.add_argument("--prompts", type=int, default=8, help="(secret, topic) prompts per step")
     ap.add_argument("--k", type=int, default=8, help="essays sampled per prompt (the RLOO group)")
@@ -229,6 +236,13 @@ def main() -> None:
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
+
+    def lam_at(step: int) -> float:
+        if not args.lam_ramp:
+            return args.lam
+        start, end = args.lam_ramp
+        return args.lam * min(1.0, max(0.0, (step - start) / (end - start)))
+
     train_words, heldout_words = game.load_words()
     topics = game.load_topics()
     if args.pool_size:
@@ -248,6 +262,7 @@ def main() -> None:
         return rng.sample(shot_pool, min(args.monitor_shots, len(shot_pool)))
 
     def evaluate(step: int) -> None:
+        args.cur_lam = lam_at(step)
         # A pool no bigger than the candidate list leaves no unseen secrets worth testing, so only it is evaluated.
         splits = {"train": train_words} if 0 < args.pool_size <= max(args.m, args.n) else {"train": train_words, "heldout": heldout_words}
         for split, words in splits.items():
@@ -268,6 +283,7 @@ def main() -> None:
         if step == args.steps:
             break
         t0 = time.time()
+        args.cur_lam = lam_at(step)
         # Each prompt is repeated k times so its essays share a leave-one-out baseline.
         eps = [e for e in episodes(train_words, args.prompts) for _ in range(args.k)]
         rollouts = play(backend, rng, eps, train_words, shots(), args)
@@ -278,7 +294,9 @@ def main() -> None:
         )
         valid = [r for r in rollouts if r["judge_pass"] and not r["leaked"]]
         shot_pool = valid or shot_pool
-        metrics = {"step": step} | summarise(rollouts, args) | step_metrics | {"secs": round(time.time() - t0, 1)}
+        metrics = (
+            {"step": step, "lam": round(args.cur_lam, 3)} | summarise(rollouts, args) | step_metrics | {"secs": round(time.time() - t0, 1)}
+        )
         print(json.dumps(metrics), flush=True)
         log(run_dir / "metrics.jsonl", [{"kind": "train"} | metrics])
         log(run_dir / "rollouts.jsonl", [{"step": step, "split": "train", "kind": "train"} | r for r in rollouts])
