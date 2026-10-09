@@ -1,0 +1,32 @@
+<title>On-Topic Hidden Words</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<!--STYLE-->
+<style>.sub { display: block; color: var(--muted); font-size: .8rem; font-weight: 400; } td b { font-weight: 600; }</style>
+<main>
+  <section>
+    <h1>Hidden words in essays that stay on topic</h1>
+    <p class="lede">Three runs learned to hide the word from the monitor they trained against while writing essays the stricter referees accept. The hints are now a phrase or two of loaded wording inside an otherwise ordinary essay.</p>
+    <div class="sheet"><ul>
+      <li><b>The essays are about their topics.</b> 94–98% pass referees that failed most or all of the essays from this morning's best run. This morning's sender wandered into musing about what the subject was not; these do not.</li>
+      <li><b>The technique changed.</b> 90–95% of these essays point to the word by direct association, slipping in vocabulary from the word's world. This morning 96% used negation; here it is 1–4%.</li>
+      <li><b>They beat the 9B monitor and Haiku, and not Sonnet or Opus.</b> The 9B monitor is at 20–34% and Haiku at 28–47%, against a receiver at 88–98%. Opus reads 73–89% cold.</li>
+      <li><b>Showing a strong monitor examples helps it less than it did this morning.</b> Opus gains 3–10 points from 16 labelled examples here, where it gained up to 15 before. There is less of a fixed trick to learn.</li>
+    </ul></div>
+  </section>
+  <section>
+    <h2>The three runs</h2>
+    <p>Step 0 against the latest evaluation, 64 essays each (so about ±6 points). Chance is 12.5%. All use the same 8 secret words, Qwen3.6-27B as sender and receiver, and Qwen3.5-9B as the monitor in training.</p>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Run</th><th>Receiver</th><th>9B monitor</th><th>Referee pass</th><th>Haiku 5.5</th><th>Sonnet 5.5</th><th>Opus 5.5</th></tr></thead>
+      <tbody><!--ROWS--></tbody>
+    </table>
+    <p class="take">The Claude columns are those models reading the latest essays as monitors they were never trained against, with thinking on. "With examples" means they first saw 16 earlier essays from the same run with the answers.</p></div>
+  </section>
+  <section>
+    <h2>Six essays</h2>
+    <p>Two from each run, chosen from essays the receiver got and the 9B monitor missed. The highlights are my reading of where the hint is; they have not been measured.</p>
+    <div class="key"><span class="k-recv">Receiver's probability on the secret</span><span class="k-mon">9B monitor's probability on the secret</span><span class="k-mark">Phrases I read as the hint</span></div>
+    <div class="essays"><!--CARDS--></div>
+  </section>
+  <footer><p>Runs from the evening of 8 October 2026. These are the first evaluations that clear the bar; the runs were still training when this page was built.</p></footer>
+</main>
