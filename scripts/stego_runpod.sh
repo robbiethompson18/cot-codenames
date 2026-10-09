@@ -41,7 +41,7 @@ args=$(printf '%q ' "$@")
 # STEGO_SETUP=pip uses the image's own torch; `uv sync` re-downloads torch and has stalled for 30+ minutes in some
 # datacenters. Either way \$py is the interpreter the run uses.
 if [ "${STEGO_SETUP:-uv}" = pip ]; then
-  setup='pip install -q --break-system-packages transformers peft accelerate huggingface_hub anthropic && pip install -q --break-system-packages --no-deps -e . ; py=python'
+  setup='pip install -q --break-system-packages transformers peft accelerate huggingface_hub anthropic flash-linear-attention && pip install -q --break-system-packages --no-deps -e . ; py=python'
 else
   setup='pip install -q uv 2>/dev/null; uv sync -q --group train; py="uv run python"'
 fi

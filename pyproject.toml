@@ -36,6 +36,10 @@ dev = [
     "ty>=0.0.84",
     "wordfreq>=3.1.1",
 ]
+# BashArena rollouts (needs Docker): uv run --group basharena python -m cot_codenames.basharena.baseline
+basharena = [
+    "control-arena>=20.0.1",
+]
 tinker = [
     "tinker>=0.32.0",
     "tinker-cookbook>=0.5.7",
@@ -43,6 +47,7 @@ tinker = [
 # Local (RunPod) backend of the stego trainer: uv run --group train python -m cot_codenames.stego.train --backend local
 train = [
     "accelerate",
+    "flash-linear-attention",  # Qwen3.5/3.6 fast path; without it every forward pass is several times slower
     "huggingface-hub",
     "peft",
     "torch",
