@@ -155,7 +155,7 @@ class LocalBackend:
         return torch.cat(rows)
 
     def _label_ids(self, tok, n_labels: int) -> list[int]:
-        ids = [tok.encode(label, add_special_tokens=False) for label in game.LABELS[:n_labels]]
+        ids = [tok.encode(label, add_special_tokens=False) for label in game.labels(n_labels)]
         assert all(len(i) == 1 for i in ids), "candidate labels must be single tokens"
         return [i[0] for i in ids]
 
@@ -194,7 +194,8 @@ class LocalBackend:
         size = max(1, min(self.args.score_batch, self.args.score_batch * 600 // max(600, longest)))
         out = []
         for batch in self._batches(list(zip(chats, answers)), size):
-            answer_ids = [tok.encode(a, add_special_tokens=False) for _, a in batch]
+            # The end-of-turn token is part of the answer, so "13" is not credited when the model was going to say "137".
+            answer_ids = [tok.encode(a, add_special_tokens=False) + [tok.eos_token_id] for _, a in batch]
             rows = [tok(_render(tok, c), add_special_tokens=False).input_ids + ids for (c, _), ids in zip(batch, answer_ids)]
             width = max(map(len, rows))
             ids = torch.full((len(rows), width), tok.pad_token_id, device=self.device)

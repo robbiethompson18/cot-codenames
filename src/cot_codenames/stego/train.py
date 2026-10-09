@@ -40,7 +40,7 @@ class Backend(Protocol):
         ...
 
     def choose(self, role: str, chats: list[Chat], n_labels: int) -> list[list[float]]:
-        """For each chat, the next-token distribution over game.LABELS[:n_labels], renormalised to sum to 1.
+        """For each chat, the next-token distribution over game.labels(n_labels), renormalised to sum to 1.
         role "receiver" uses the current policy; role "monitor" uses the frozen monitor model."""
         ...
 
@@ -135,7 +135,7 @@ def play(
         return [remonitor.monitor_chat(d, few, force_answer=force) for d in seen]
 
     p_recv = backend.choose("receiver", recv_chats, args.m)
-    if args.n > len(game.LABELS):
+    if not game.one_token(args.n):
         # Too many candidates for a one-token answer: score the true label's probability and the greedy answer instead.
         answers = [game.labels(args.n)[i] for _, i in mon]
         scored = backend.label_prob("monitor", mon_chats(args.monitor_sees, shots, False), answers)
@@ -176,7 +176,7 @@ def play(
                 "recv_correct": max(range(args.m), key=p_recv[i].__getitem__) == ri,
                 "mon_correct": mon_right[i],
                 "recv_candidates": recv[i][0],
-                "mon_candidates": mon[i][0] if args.n <= len(game.LABELS) else [],  # 500 words per essay is too much to log
+                "mon_candidates": mon[i][0] if game.one_token(args.n) else [],  # 500 words per essay is too much to log
                 "recv_probs": [round(p, 4) for p in p_recv[i]],
                 "mon_probs": [round(p, 4) for p in p_mon[i]] if p_mon else [],
                 "mon_text": mon_text[i],
@@ -243,6 +243,12 @@ def main() -> None:
     ap.add_argument("--pool-max", type=int, default=256, help="largest pool --pool-grow reaches")
     ap.add_argument("--grow-score", type=float, default=0.4, help="mean score of the last 5 batches needed to double the pool")
     ap.add_argument("--grow-min-steps", type=int, default=15, help="fewest steps between doublings")
+    ap.add_argument(
+        "--labels",
+        choices=["numbers", "letters"],
+        default="numbers",
+        help="how candidates are labelled; letters only to continue a run trained on letters",
+    )
     ap.add_argument("--m", type=int, default=8, help="receiver's candidate list size")
     ap.add_argument("--n", type=int, default=8, help="monitor's candidate list size")
     ap.add_argument("--lam", type=float, default=1.0, help="monitor penalty weight; 0 = control arm")
@@ -272,6 +278,8 @@ def main() -> None:
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
+    game.LABEL_STYLE = args.labels
+    assert game.one_token(args.m), "the receiver's list must be short enough for one-token labels"
 
     def lam_at(step: int) -> float:
         if not args.lam_ramp:
@@ -301,7 +309,7 @@ def main() -> None:
         args.cur_lam = lam_at(step)
         train_words = all_train[:pool_n]
         # A small fixed pool leaves no unseen secrets worth testing, unless the point of the run is to grow it.
-        small = 0 < args.pool_size <= max(args.m, min(args.n, len(game.LABELS))) and not args.pool_grow
+        small = 0 < args.pool_size <= max(args.m, min(args.n, 52)) and not args.pool_grow
         splits = (
             {"train": (train_words, all_train)} if small else {"train": (train_words, all_train), "heldout": (heldout_words, heldout_words)}
         )

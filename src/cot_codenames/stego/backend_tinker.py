@@ -121,7 +121,7 @@ class TinkerBackend:
         return out  # ty: ignore[invalid-return-type]
 
     def _label_ids(self, role: str, n_labels: int) -> list[int]:
-        ids = [self.renderer[role].tokenizer.encode(label, add_special_tokens=False) for label in game.LABELS[:n_labels]]
+        ids = [self.renderer[role].tokenizer.encode(label, add_special_tokens=False) for label in game.labels(n_labels)]
         assert all(len(i) == 1 for i in ids), "candidate labels must be single tokens"
         return [i[0] for i in ids]
 
