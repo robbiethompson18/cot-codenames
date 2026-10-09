@@ -190,8 +190,11 @@ class LocalBackend:
         return self._label_prob(self.policy, self.tok, chats, answers)
 
     def _label_prob(self, model, tok, chats: list[Chat], answers: list[str]) -> list[tuple[float, bool]]:
-        longest = max(len(c[0]["content"]) for c in chats) // 4
-        size = max(1, min(self.args.score_batch, self.args.score_batch * 600 // max(600, longest)))
+        # The model returns logits for every position over the whole vocabulary (about 0.5 MB per token), and a
+        # 500-candidate prompt is about 4,000 tokens, so these go through a few thousand tokens at a time. Batching them
+        # like ordinary prompts asked for 60 GB in one allocation.
+        longest = max(len(c[0]["content"]) for c in chats) // 3
+        size = max(1, min(self.args.score_batch, 6000 // longest))
         out = []
         for batch in self._batches(list(zip(chats, answers)), size):
             # The end-of-turn token is part of the answer, so "13" is not credited when the model was going to say "137".
@@ -203,10 +206,10 @@ class LocalBackend:
             for i, row in enumerate(rows):  # left-padded, so every answer ends at the last position
                 ids[i, width - len(row) :] = torch.tensor(row)
                 attn[i, width - len(row) :] = 1
-            logp = model(input_ids=ids, attention_mask=attn).logits.float().log_softmax(-1)
+            logits = model(input_ids=ids, attention_mask=attn).logits
             for i, answer in enumerate(answer_ids):
-                # The token at position t is predicted from position t - 1.
-                steps = logp[i, width - len(answer) - 1 : width - 1]
+                # The token at position t is predicted from position t - 1. Only those few positions are normalised.
+                steps = logits[i, width - len(answer) - 1 : width - 1].float().log_softmax(-1)
                 target = torch.tensor(answer, device=self.device)
                 total = steps.gather(1, target[:, None]).sum().item()
                 out.append((float(torch.tensor(total).exp()), bool((steps.argmax(-1) == target).all())))
