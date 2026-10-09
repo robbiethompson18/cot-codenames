@@ -1,6 +1,7 @@
 """Essay referee (quality floor): Claude Haiku says whether a sender's essay passes as an ordinary essay on its topic. The judge
 never sees the secret word, so it cannot be asked to look for it; the grep floor in game.leaked covers that."""
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
@@ -96,5 +97,15 @@ def judge(items: list[tuple[str, str]], referee: str = "strict", workers: int = 
     """items are (topic, essay); referee is "strict", "medium" or "lenient". Returns, in order,
     {"pass", "text" (the referee's full answer), "in", "out" (tokens)}."""
     one = {"strict": _judge_one, "medium": partial(_judge_one, prompt=MEDIUM_PROMPT), "lenient": _judge_lenient}[referee]
+
+    def patient(item: tuple[str, str]) -> dict:
+        # A pod's network can drop for longer than the SDK's own retries cover, and one lost call used to end the run.
+        for attempt in range(6):
+            try:
+                return one(item)
+            except (anthropic.APIConnectionError, anthropic.InternalServerError, anthropic.RateLimitError):
+                time.sleep(20 * (attempt + 1))
+        return one(item)
+
     with ThreadPoolExecutor(workers) as pool:
-        return list(pool.map(one, items))
+        return list(pool.map(patient, items))
