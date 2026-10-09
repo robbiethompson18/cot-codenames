@@ -138,7 +138,8 @@ class LocalBackend:
         for chat, prompt, cot, essay, span in zip(chats, prompts, cots, essays, forced):
             raw = {"prompt_ids": prompt, "completion_ids": cot + essay, "forced": span}
             reasoning, _ = game.split_reasoning(self.tok.decode(cot, skip_special_tokens=True))
-            out.append(Sample(chat, self.tok.decode(essay, skip_special_tokens=True).strip(), raw, reasoning))
+            stray, text = game.split_answer(self.tok.decode(essay, skip_special_tokens=True))
+            out.append(Sample(chat, text, raw, (reasoning + "\n\n[after the reasoning was closed]\n" + stray) if stray else reasoning))
         return out
 
     def _next_logits(self, model, tok, chats: list[Chat], batch_size: int) -> torch.Tensor:
