@@ -38,12 +38,12 @@ printf 'export HF_TOKEN=%s\nexport ANTHROPIC_API_KEY=%s\nexport HF_HOME=/root/hf
   ssh "${ssh_opts[@]}" "root@$host" 'umask 077; cat > /root/.stego_env'
 
 args=$(printf '%q ' "$@")
-# STEGO_SETUP=pip uses the image's own torch. DO NOT use it for training: with that torch's Triton, flash-linear-attention
-# refuses to run the backward pass on H100/H200 ("incorrect results for gated chunk_bwd"). Kept only for inference jobs.
+# STEGO_SETUP=pip uses the image's own torch and upgrades Triton: with the image's Triton 3.5, flash-linear-attention
+# refuses to run the backward pass on H100/H200 ("incorrect results for gated chunk_bwd").
 # Background: `uv sync` re-downloads torch and has stalled for 30+ minutes in some
 # datacenters. Either way \$py is the interpreter the run uses.
 if [ "${STEGO_SETUP:-uv}" = pip ]; then
-  setup='pip install -q --break-system-packages transformers peft accelerate huggingface_hub anthropic flash-linear-attention && pip install -q --break-system-packages --no-deps -e . ; py=python'
+  setup='pip install -q --break-system-packages transformers peft accelerate huggingface_hub anthropic flash-linear-attention "triton>=3.7.1" && pip install -q --break-system-packages --no-deps -e . ; py=python'
 else
   # uv has stalled mid-download in some datacenters, so it gets 10 minutes and one retry.
   setup='pip install -q uv 2>/dev/null; timeout 600 uv sync -q --group train || timeout 900 uv sync -q --group train; py="uv run python"'
@@ -56,6 +56,8 @@ $setup
 # Whether training finished or crashed: keep the log with the run, upload, and release the pod.
 mkdir -p runs/stego/$run && cp /workspace/$run.log runs/stego/$run/train.log
 \$py -c "from huggingface_hub import upload_folder; upload_folder(repo_id='$repo', folder_path='runs/stego/$run', path_in_repo='runs/$run')"
+# The pod's own API key lives in PID 1's environment, not in ssh or tmux shells; runpodctl needs it.
+export RUNPOD_API_KEY=\$(tr '\\0' '\\n' < /proc/1/environ | grep ^RUNPOD_API_KEY= | cut -d= -f2-)
 runpodctl remove pod $pod || runpodctl stop pod $pod
 REMOTE
 ssh "${ssh_opts[@]}" "root@$host" "tmux kill-server 2>/dev/null; pkill -f '[u]v sync' 2>/dev/null; tmux new -d -s $run 'bash /workspace/run_$run.sh'"
