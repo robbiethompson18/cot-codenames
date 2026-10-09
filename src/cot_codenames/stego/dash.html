@@ -50,6 +50,7 @@ details { margin-top: 10px; } summary { cursor: pointer; color: var(--muted); }
 <script>
 const E = s => String(s ?? "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
 const pct = v => v == null ? "—" : Math.round(v * 100) + "%";
+const pacific = t => { const d = new Date(String(t).replace(/([+-]\d\d)(\d\d)$/, "$1:$2")); return isNaN(d) ? (t || "?") : d.toLocaleString("en-US", {timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) + " Pacific"; };
 let runs = [], selected = location.hash.slice(1) || null;
 
 function chart(series, {ymin = 0, ymax = 1, xmax, percent = true, chance = null}) {
@@ -81,7 +82,9 @@ function panel(title, items, opts, note = "") {
 function latest(r, key) {
   const ev = r.evals.filter(e => e.split === "train"); if (!ev.length) return "<span class='num'>—</span>";
   const a = ev[0], b = ev[ev.length - 1];
-  return `<span class="num">${pct(b[key])}</span><span class="from">from ${pct(a[key])} · step ${b.step}</span>`;
+  const recent = r.train.slice(-5), avg = recent.length ? recent.reduce((t, m) => t + m[key], 0) / recent.length : null;
+  const live = recent.length && recent[recent.length - 1].step > b.step ? `<span class="from">last ${recent.length} batches: ${pct(avg)}</span>` : "";
+  return `<span class="num">${pct(b[key])}</span><span class="from">from ${pct(a[key])} · step ${b.step}</span>${live}`;
 }
 function row(r) {
   const cls = r.status.split(" ")[0];
@@ -95,7 +98,7 @@ function detail(r) {
   const tr = r.train, ev = r.evals.filter(e => e.split === "train"), ho = r.evals.filter(e => e.split === "heldout");
   const xmax = r.steps, chance = 1 / (r.config.n || 8), cot = !!r.config.sender_thinking;
   const three = (rows, faint) => [["Receiver", "--s1", "recv_correct"], ["Monitor", "--s2", "mon_correct"], ["Referee pass", "--s3", "judge_pass"]].map(([name, color, k]) => ({name, color, faint, pts: pts(rows, k)}));
-  let h = `<h2>${E(r.run)}</h2><div class="sub">${E(r.note)} · started ${E(r.started)} · commit ${E(r.git_sha || "not recorded")} · pod ${E(r.pod || "—")}</div><div class="charts">`;
+  let h = `<h2>${E(r.run)}</h2><div class="sub">${E(r.note)} · started ${E(pacific(r.started))} · commit ${E(r.git_sha || "not recorded")} · pod ${E(r.pod || "—")}</div><div class="charts">`;
   h += panel("Reward", [{name: "training batch", color: "--s4", faint: true, pts: pts(tr, "reward")}, {name: "evaluation", color: "--s4", pts: pts(ev, "reward")}], {ymin: -1, ymax: 1, xmax, percent: false}, "Mean reward per essay. −1 is a failed essay, 0 is saying nothing, 1 is a perfect hidden message.");
   h += panel("Receiver, monitor and referee", [...three(tr, true), ...three(ev, false)], {xmax, chance}, "Dots are evaluations; faint lines are training batches.");
   h += panel("On held-out words", three(ho, false).slice(0, 2), {xmax, chance});
