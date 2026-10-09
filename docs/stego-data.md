@@ -22,6 +22,18 @@ the pod.
 | `runs/calibration/` | 64 honest essays, referee transcripts, and the referee prompt the calibration used       |
 | `runs/offline/`     | Experiments that need no training (`offline.py`), one file per experiment plus a summary |
 
+## Dashboard
+
+`uv run python -m cot_codenames.stego.dash` serves <http://stego.localhost/> (port 7103): one row
+per run with its models, referee, thinking setting, progress and latest results; click a row for
+curves and the latest essays. It copies `config.json`, `metrics.jsonl` and the last evaluation
+essays off each reachable pod on every refresh.
+
+Each run folder also has `launch.json`, written by `scripts/stego_runpod.sh`: pod id and address,
+the arguments, the git commit and a one-line purpose (`STEGO_NOTE=... scripts/stego_runpod.sh ...`).
+Add `"gone": true` when a pod is deleted by hand and `"stopped": "<why>"` to label the row. Only
+runs with a `launch.json` appear on the dashboard.
+
 ## Rollout fields
 
 `step`, `split` (`train` or `heldout` words), `kind`, `secret`, `topic`, `essay`, `recv_candidates`,

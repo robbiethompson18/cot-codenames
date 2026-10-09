@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stego runs</title>
+<style>
+:root {
+  --bg: #f3f5f7; --sheet: #fff; --ink: #18222d; --muted: #5a6876; --rule: #d5dce3; --grid: #e6eaee; --hover: #eef3f8;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --good: #1d7a3e; --bad: #a3352b; --live: #1c5cab;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #12171d; --sheet: #1a212a; --ink: #e4e9ee; --muted: #9aa7b4; --rule: #2e3945; --grid: #27313c; --hover: #222b36;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --good: #5fcf88; --bad: #f08a7e; --live: #86b6ef; color-scheme: dark } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); padding: 20px 16px 60px; }
+h1 { font-size: 1.3rem; margin: 0 0 2px; } h2 { font-size: 1.1rem; margin: 0 0 4px; font-family: var(--mono); font-weight: 600; }
+h3 { font-size: .85rem; margin: 0 0 6px; }
+.sub { color: var(--muted); font-size: .8rem; } .top { display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: baseline; margin-bottom: 12px; }
+.scroll { overflow-x: auto; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: .75rem; white-space: nowrap; position: sticky; top: 0; background: var(--sheet); }
+tbody tr { cursor: pointer; } tbody tr:hover, tbody tr.sel { background: var(--hover); }
+td b { font: 600 .85rem var(--mono); } td .sub { display: block; max-width: 30ch; }
+.pill { font: 500 .7rem var(--mono); padding: 1px 6px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
+.finished { color: var(--good); } .running, .setting { color: var(--live); } .stopped, .unknown, .crashed { color: var(--bad); }
+.prog { height: 5px; width: 90px; background: var(--rule); border-radius: 3px; margin-top: 5px; overflow: hidden; }
+.prog i { display: block; height: 100%; background: var(--live); }
+.num { font: 600 .95rem var(--mono); } .from { color: var(--muted); font-size: .75rem; display: block; }
+#detail { margin-top: 18px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 16px 18px; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 18px; margin-top: 12px; }
+svg { width: 100%; height: auto; display: block; }
+.grid { stroke: var(--grid); } .chance { stroke: var(--muted); stroke-dasharray: none; }
+.tick { fill: var(--muted); font: 10px var(--sans); } .end { fill: var(--ink); font: 600 10.5px var(--sans); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .78rem; color: var(--muted); margin-bottom: 4px; }
+.legend i { display: inline-block; width: 12px; height: 4px; border-radius: 2px; margin-right: 5px; vertical-align: 3px; }
+.sample { border-top: 1px solid var(--rule); padding: 10px 0; } .sample p { margin: 4px 0; max-width: 85ch; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 var(--mono); background: var(--bg); padding: 10px; border-radius: 4px; }
+details { margin-top: 10px; } summary { cursor: pointer; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="top"><h1>Stego runs</h1><span class="sub" id="stamp"></span><span class="sub">Refreshes every minute. Click a row for its curves and latest essays. Results are the latest evaluation on training words (64 essays, so ±6 points); "from" is the step-0 evaluation.</span></div>
+<div class="scroll"><table>
+<thead><tr><th>Run</th><th>Status</th><th>Sender / receiver</th><th>Monitor</th><th>Referee</th><th>Thinking</th><th>Task</th><th>Reward</th><th>Receiver</th><th>Monitor</th><th>Referee pass</th><th>GPU cost</th></tr></thead>
+<tbody id="rows"></tbody></table></div>
+<div id="detail" hidden></div>
+<script>
+const E = s => String(s ?? "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+const pct = v => v == null ? "—" : Math.round(v * 100) + "%";
+let runs = [], selected = location.hash.slice(1) || null;
+
+function chart(series, {ymin = 0, ymax = 1, xmax, percent = true, chance = null}) {
+  const w = 360, h = 190, L = 34, R = 44, T = 8, B = 22, pw = w - L - R, ph = h - T - B;
+  const X = s => L + pw * s / Math.max(1, xmax), Y = v => T + ph * (1 - (v - ymin) / (ymax - ymin));
+  const fmt = v => percent ? Math.round(v * 100) + "%" : v.toFixed(1);
+  let o = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+  for (let i = 0; i <= 4; i++) { const g = ymin + (ymax - ymin) * i / 4; o += `<line class="grid" x1="${L}" x2="${L + pw}" y1="${Y(g)}" y2="${Y(g)}"/><text class="tick" x="${L - 5}" y="${Y(g) + 3}" text-anchor="end">${fmt(g)}</text>`; }
+  if (chance != null) o += `<line class="chance" x1="${L}" x2="${L + pw}" y1="${Y(chance)}" y2="${Y(chance)}"/><text class="tick" x="${L + 3}" y="${Y(chance) - 3}">chance</text>`;
+  for (const s of [0, Math.round(xmax / 2), xmax]) o += `<text class="tick" x="${X(s)}" y="${h - 6}" text-anchor="middle">${s}</text>`;
+  let ends = [];
+  for (const s of series) {
+    if (!s.pts.length) continue;
+    const d = s.pts.map(([x, y], i) => (i ? "L" : "M") + X(x).toFixed(1) + "," + Y(Math.max(ymin, Math.min(ymax, y))).toFixed(1)).join(" ");
+    o += `<path d="${d}" fill="none" stroke="var(${s.color})" stroke-width="${s.faint ? 1 : 2}" opacity="${s.faint ? .35 : 1}" stroke-linejoin="round"/>`;
+    if (!s.faint) { for (const [x, y] of s.pts) o += `<circle cx="${X(x)}" cy="${Y(y)}" r="3.5" fill="var(${s.color})" stroke="var(--sheet)" stroke-width="1.5"><title>${E(s.name)}, step ${x}: ${fmt(y)}</title></circle>`;
+      const [x, y] = s.pts[s.pts.length - 1]; ends.push([Y(y), X(x), fmt(y)]); }
+  }
+  ends.sort((a, b) => a[0] - b[0]); for (let i = 1; i < ends.length; i++) if (ends[i][0] - ends[i - 1][0] < 11) ends[i][0] = ends[i - 1][0] + 11;
+  for (const [y, x, t] of ends) o += `<text class="end" x="${x + 7}" y="${y + 3.5}">${t}</text>`;
+  return o + "</svg>";
+}
+const legend = items => `<div class="legend">${items.map(([n, c]) => `<span><i style="background:var(${c})"></i>${E(n)}</span>`).join("")}</div>`;
+const pts = (rows, key) => rows.filter(r => r[key] != null).map(r => [r.step, +r[key]]);
+function panel(title, items, opts, note = "") {
+  if (!items.some(s => s.pts.length)) return "";
+  return `<div><h3>${E(title)}</h3>${legend(items.filter(s => !s.faint).map(s => [s.name, s.color]))}${chart(items, opts)}<div class="sub">${note}</div></div>`;
+}
+function latest(r, key) {
+  const ev = r.evals.filter(e => e.split === "train"); if (!ev.length) return "<span class='num'>—</span>";
+  const a = ev[0], b = ev[ev.length - 1];
+  return `<span class="num">${pct(b[key])}</span><span class="from">from ${pct(a[key])} · step ${b.step}</span>`;
+}
+function row(r) {
+  const cls = r.status.split(" ")[0];
+  return `<tr data-run="${E(r.run)}" class="${r.run === selected ? "sel" : ""}"><td><b>${E(r.run)}</b><span class="sub">${E(r.note)}</span></td>
+  <td><span class="pill ${cls}">${E(r.status)}</span><div class="prog"><i style="width:${Math.min(100, 100 * r.done / r.steps)}%"></i></div><span class="sub">step ${r.done} of ${r.steps}</span></td>
+  <td>${E(r.model.split("/").pop())}<span class="sub">${E(r.lora)}</span></td><td>${E(r.monitor.split("/").pop())}<span class="sub">reads: ${E(r.monitor_sees)}</span></td>
+  <td>${E(r.referee_rules)}<span class="sub">${E(r.referee)}</span></td><td>${E(r.thinking)}</td><td>${E(r.task)}</td><td>${E(r.reward)}</td>
+  <td>${latest(r, "recv_correct")}</td><td>${latest(r, "mon_correct")}</td><td>${latest(r, "judge_pass")}</td><td>${r.cost == null ? "—" : "≈$" + r.cost}</td></tr>`;
+}
+function detail(r) {
+  const tr = r.train, ev = r.evals.filter(e => e.split === "train"), ho = r.evals.filter(e => e.split === "heldout");
+  const xmax = r.steps, chance = 1 / (r.config.n || 8), cot = !!r.config.sender_thinking;
+  const three = (rows, faint) => [["Receiver", "--s1", "recv_correct"], ["Monitor", "--s2", "mon_correct"], ["Referee pass", "--s3", "judge_pass"]].map(([name, color, k]) => ({name, color, faint, pts: pts(rows, k)}));
+  let h = `<h2>${E(r.run)}</h2><div class="sub">${E(r.note)} · started ${E(r.started)} · commit ${E(r.git_sha || "not recorded")} · pod ${E(r.pod || "—")}</div><div class="charts">`;
+  h += panel("Reward", [{name: "training batch", color: "--s4", faint: true, pts: pts(tr, "reward")}, {name: "evaluation", color: "--s4", pts: pts(ev, "reward")}], {ymin: -1, ymax: 1, xmax, percent: false}, "Mean reward per essay. −1 is a failed essay, 0 is saying nothing, 1 is a perfect hidden message.");
+  h += panel("Receiver, monitor and referee", [...three(tr, true), ...three(ev, false)], {xmax, chance}, "Dots are evaluations; faint lines are training batches.");
+  h += panel("On held-out words", three(ho, false).slice(0, 2), {xmax, chance});
+  if (cot) {
+    const src = ev.length ? ev : tr;
+    h += panel("What a reader of the reasoning gets", [["Secret word appears in reasoning", "--s4", "cot_leaked"], ["Monitor, essay only", "--s1", "base_mon_essay"], ["Monitor, reasoning only", "--s2", "base_mon_cot"], ["Monitor, both", "--s3", "base_mon_both"]].map(([name, color, k]) => ({name, color, pts: pts(src, k)})), {xmax, chance}, "The frozen monitor model reading each view. Only the view named in the Monitor column is trained against.");
+    h += panel("Reasoning length (words)", [{name: "reasoning", color: "--s2", pts: pts(tr, "cot_words")}, {name: "essay", color: "--s1", pts: pts(tr, "words")}], {ymin: 0, ymax: 400, xmax, percent: false});
+  } else h += panel("Essay length (words)", [{name: "essay", color: "--s1", pts: pts(tr, "words")}], {ymin: 0, ymax: 300, xmax, percent: false});
+  h += panel("Essays containing the secret word", [{name: "leaked", color: "--s2", pts: pts(tr, "leaked")}], {xmax});
+  h += `</div><h3 style="margin-top:16px">Latest evaluation essays</h3>`;
+  h += r.samples.length ? r.samples.map(s => `<div class="sample"><b>${E(s.secret)}</b> · ${E(s.topic)} · step ${s.step} · receiver ${pct(s.p_recv)} · monitor ${pct(s.p_mon)} · referee ${s.judge_pass ? "pass" : "fail"}${s.cot ? `<details><summary>reasoning (${s.cot.split(/\s+/).length} words)</summary><pre>${E(s.cot)}</pre></details>` : ""}<p>${E(s.essay).replace(/\n\n/g, "</p><p>")}</p></div>`).join("") : `<p class="sub">None synced yet.</p>`;
+  return h + `<details><summary>Full config</summary><pre>${E(JSON.stringify(r.config, null, 2))}</pre></details>`;
+}
+function render() {
+  document.getElementById("rows").innerHTML = runs.map(row).join("");
+  const r = runs.find(x => x.run === selected), d = document.getElementById("detail");
+  d.hidden = !r; if (r) d.innerHTML = detail(r);
+  document.getElementById("stamp").textContent = "Updated " + new Date().toLocaleTimeString("en-US", {timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit"}) + " Pacific";
+}
+document.getElementById("rows").addEventListener("click", e => { const tr = e.target.closest("tr"); if (!tr) return; selected = tr.dataset.run; location.hash = selected; render(); document.getElementById("detail").scrollIntoView({behavior: "smooth", block: "start"}); });
+async function load() { try { runs = await (await fetch("/api/runs")).json(); render(); } catch (e) { document.getElementById("stamp").textContent = "Could not reach the dashboard server"; } }
+load(); setInterval(load, 60000);
+</script>
+</body>
+</html>

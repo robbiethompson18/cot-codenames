@@ -56,4 +56,12 @@ export RUNPOD_API_KEY=\$(tr '\\0' '\\n' < /proc/1/environ | grep ^RUNPOD_API_KEY
 runpodctl remove pod $pod || runpodctl stop pod $pod
 REMOTE
 ssh "${ssh_opts[@]}" "root@$host" "tmux kill-server 2>/dev/null; pkill -f '[u]v sync' 2>/dev/null; pkill -f '[p]ip install' 2>/dev/null; rm -f /workspace/$run.log; tmux new -d -s $run 'bash /workspace/run_$run.sh'"
+# A local record of the run for the dashboard (cot_codenames.stego.dash). STEGO_NOTE is a one-line purpose.
+mkdir -p "runs/stego/$run"
+python3 - "$run" "$pod" "$host" "$port" "$sha" "${STEGO_NOTE:-}" "$@" <<'PY' > "runs/stego/$run/launch.json"
+import json, sys, time
+run, pod, host, port, sha, note, *args = sys.argv[1:]
+print(json.dumps({"run": run, "note": note, "pod": pod, "host": host, "port": int(port), "git_sha": sha, "args": args,
+                  "started": time.strftime("%Y-%m-%dT%H:%M:%S%z")}, indent=2))
+PY
 echo "$run: started on $pod ($host:$port)"
