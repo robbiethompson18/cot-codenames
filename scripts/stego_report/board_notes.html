@@ -1,7 +1,7 @@
 <section><div class="sheet"><ul>
-<li><b>Plan changed at about 5 PM Pacific.</b> Training from scratch against a same-size (27B) monitor collapses: the sender stops communicating. So the current runs train against the weaker 9B monitor, with and without sender reasoning, plus one bootstrapping run that swaps in the 27B after a code already exists.</li>
-<li><b>Sender reasoning, before any training:</b> the sender writes the secret word in its reasoning 100% of the time, and a monitor reading that reasoning gets 100%.</li>
-<li><b>Reasoning-on runs use half the batch</b> (4 essays per prompt, not 8) to keep cost down, so their curves are noisier.</li>
-<li><b>On hold until there is more RunPod balance:</b> the 1,000-token essay-only run and the 300-word runs at ranks 8, 32 and 128.</li>
-<li>Each reasoning-on panel also logs what an untrained-against monitor gets from the reasoning alone, the essay alone, and both; that view is not charted here yet.</li>
+<li><b>Focus narrowed at about 7 PM Pacific.</b> Reasoning experiments are moving to gpt-oss-120b on Tinker, which has a reasoning-effort setting. Qwen's reasoning has no length control: it always overran its budget and spilled into the essay. A wiring test for gpt-oss is in progress.</li>
+<li><b>Running on RunPod:</b> the no-reasoning recipe with the new referee, one Qwen reasoning run trained against a monitor that reads the reasoning (as a comparison), a bootstrapping run, and the run that records the collapse against a same-size monitor.</li>
+<li><b>Stopped:</b> the Qwen essay-only reasoning run and the 1,000-token run. <b>Parked:</b> rank sweep, many words, Sonnet or few-shot monitors in the loop.</li>
+<li><b>Without reasoning, the "say what it is not" trick is learned, not built in:</b> 4% of untrained essays use it, 96% by step 70 against the 9B monitor.</li>
+<li>Why reasoning made Qwen's essays worse, with samples: <a href="https://claude.ai/artifact/9rRLgxaC21pZVxaPtESQxL">Reasoning Essay Samples</a>.</li>
 </ul></div></section>

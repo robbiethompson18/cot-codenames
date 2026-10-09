@@ -21,9 +21,7 @@ pct = lambda v: f"{round(v * 100)}%"
 # (run, steps, what changes, the question it answers)
 RUNS = [
     ("fixed8-9b", 100, "8 fixed words · 9B monitor · new referee · no reasoning", "Does the recipe that worked this morning still learn once off-topic essays are banned?"),
-    ("cot300-9b-essay", 100, "sender reasons (300 tokens) · 9B monitor reads the essay only", "Does being able to plan change what the sender learns? Would a reader of its reasoning have caught it?"),
     ("cot300-9b-both", 100, "sender reasons (300 tokens) · 9B monitor reads reasoning + essay", "Trained against a reasoning monitor: does the reasoning stop naming the word, and what replaces it?"),
-    ("cot1k-9b-both", 60, "sender reasons (1,000 tokens) · 9B monitor reads reasoning + essay", "Same with a larger reasoning budget."),
     ("bootstrap-27b-from-runpod-fixed8", 100, "starts from this morning's 9B-trained checkpoint · 27B monitor", "Bootstrapping: can a sender that already has a code keep it against a same-size monitor?"),
     ("fixed8-strict", 100, "8 fixed words · 27B monitor · no reasoning", "Trained from scratch against a same-size monitor. Collapsed to chance by step 25."),
 ]
