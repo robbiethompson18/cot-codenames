@@ -53,3 +53,13 @@ train = [
     "torch",
     "transformers",
 ]
+
+# Linux pods get the CUDA 12.6 build of torch. The default (CUDA 13) wheel needs NVIDIA driver 580+, and about half of
+# RunPod's H200 hosts were still on 570 on 2026-10-08: torch then sees no GPU at all.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu126", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true

@@ -15,8 +15,8 @@ sha=$(git rev-parse HEAD)
 
 pod=${STEGO_POD:-}
 # STEGO_DC pins datacenters (comma-separated). On 2026-10-08 US-GA-2 and CA-MTL-3 had driver 580; US-NC-1 had 570.
-# The lockfile's torch is built for CUDA 13, which needs NVIDIA driver 580 or newer. Hosts on 570 boot fine but torch
-# cannot see the GPU, so a fresh pod is checked and replaced until one has a new enough driver.
+# The lockfile pins torch's CUDA 12.6 build on Linux, which needs NVIDIA driver 560 or newer (the CUDA 13 build needed
+# 580 and silently saw no GPU on hosts with 570). A fresh pod is checked and replaced if its driver is older than that.
 for attempt in 1 2 3 4 5 6; do
   if [ -z "$pod" ]; then
     # One H200 (141 GB) or B200 (180 GB) holds the 27B plus training activations at --micro-batch 2.
@@ -33,8 +33,8 @@ for attempt in 1 2 3 4 5 6; do
   ssh_opts=(-i "$key" -p "$port" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
   until ssh "${ssh_opts[@]}" "root@$host" true 2>/dev/null; do sleep 5; done
   driver=$(ssh "${ssh_opts[@]}" "root@$host" "nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | cut -d. -f1")
-  [ "${driver:-0}" -ge 580 ] && break
-  echo "$run: pod $pod has NVIDIA driver $driver (need 580+), replacing it"
+  [ "${driver:-0}" -ge 560 ] && break
+  echo "$run: pod $pod has NVIDIA driver $driver (need 560+), replacing it"
   runpodctl pod delete "$pod" >/dev/null
   pod=""
 done
