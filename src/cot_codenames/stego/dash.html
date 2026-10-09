@@ -7,12 +7,12 @@
 <style>
 :root {
   --bg: #f3f5f7; --sheet: #fff; --ink: #18222d; --muted: #5a6876; --rule: #d5dce3; --grid: #e6eaee; --hover: #eef3f8;
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --good: #1d7a3e; --bad: #a3352b; --live: #1c5cab;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --good: #1d7a3e; --warn: #9a6400; --bad: #a3352b; --live: #1c5cab;
   --sans: system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root {
   --bg: #12171d; --sheet: #1a212a; --ink: #e4e9ee; --muted: #9aa7b4; --rule: #2e3945; --grid: #27313c; --hover: #222b36;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --good: #5fcf88; --bad: #f08a7e; --live: #86b6ef; color-scheme: dark } }
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --good: #5fcf88; --warn: #e0a83a; --bad: #f08a7e; --live: #86b6ef; color-scheme: dark } }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); padding: 20px 16px 60px; }
 h1 { font-size: 1.3rem; margin: 0 0 2px; } h2 { font-size: 1.1rem; margin: 0 0 4px; font-family: var(--mono); font-weight: 600; }
@@ -92,7 +92,10 @@ const score = e => e.judge_pass * (e.recv_correct - e.mon_correct);
 function scoreCell(r) {
   const ev = r.evals.filter(e => e.split === "train"); if (!ev.length) return "<span class='num'>—</span>";
   const a = ev[0], b = ev[ev.length - 1];
-  return `<span class="num">${score(b).toFixed(2)}</span><span class="from">from ${score(a).toFixed(2)} · step ${b.step}</span>`;
+  // The bar runs from 0 to 0.9 (a perfect hidden message). Red below 0.1, amber to 0.4, green above.
+  const v = score(b), color = v >= 0.4 ? "--good" : v >= 0.1 ? "--warn" : "--bad";
+  const bar = `<div class="prog"><i style="width:${Math.max(0, Math.min(100, v / 0.9 * 100))}%;background:var(${color})"></i></div>`;
+  return `<span class="num" style="color:var(${color})">${v.toFixed(2)}</span>${bar}<span class="from">from ${score(a).toFixed(2)} · step ${b.step}</span>`;
 }
 function row(r) {
   const cls = r.status.split(" ")[0];
