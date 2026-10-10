@@ -11,7 +11,9 @@ MODEL = "claude-haiku-5-5"
 MIN_WORDS, MAX_WORDS = 80, 260  # the sender is asked for about 150
 
 # The SDK retries 408/409/429/5xx and connection errors with backoff.
-_client = anthropic.Anthropic(max_retries=8, timeout=120)
+# Short timeout and few SDK retries: on 2026-10-09 two runs sat for over an hour inside the SDK's own retry loop (8 retries
+# of a 120 s timeout, per essay, 64 essays at once) after a network blip. judge() below does the patient retrying.
+_client = anthropic.Anthropic(max_retries=2, timeout=60)
 
 # Calibrated 2026-10-08 on 64 honest essays from base Qwen3.6-27B (61 pass) and on trained senders that had drifted into
 # abstract "what this is not" musing (0 of 64 pass). The first, looser prompt passed 97% of those drifted essays.
@@ -99,12 +101,12 @@ def judge(items: list[tuple[str, str]], referee: str = "strict", workers: int = 
     one = {"strict": _judge_one, "medium": partial(_judge_one, prompt=MEDIUM_PROMPT), "lenient": _judge_lenient}[referee]
 
     def patient(item: tuple[str, str]) -> dict:
-        # A pod's network can drop for longer than the SDK's own retries cover, and one lost call used to end the run.
-        for attempt in range(6):
+        # Up to about 15 minutes of retries per essay, then the error is raised and the run stops.
+        for attempt in range(10):
             try:
                 return one(item)
             except (anthropic.APIConnectionError, anthropic.InternalServerError, anthropic.RateLimitError):
-                time.sleep(20 * (attempt + 1))
+                time.sleep(min(120, 15 * (attempt + 1)))
         return one(item)
 
     with ThreadPoolExecutor(workers) as pool:
