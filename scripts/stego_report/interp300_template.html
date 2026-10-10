@@ -1,0 +1,86 @@
+<title>Reading the Hidden Word</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<!--STYLE-->
+<style>
+  main { max-width: 56rem; }
+  .grp { font: 600 0.82rem/1.3 "Public Sans", sans-serif; margin: 1.1rem 0 0.4rem; opacity: 0.8; }
+  .hb { display: grid; grid-template-columns: minmax(9rem, 19rem) 1fr 3rem; gap: 0.6rem; align-items: center; margin: 0.28rem 0; font-size: 0.9rem; }
+  .hb .tr { position: relative; height: 14px; border-radius: 4px; background: color-mix(in srgb, currentColor 9%, transparent); }
+  .hb .tr i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+  .hb .tr em { position: absolute; top: -3px; bottom: -3px; width: 1px; background: currentColor; opacity: 0.45; }
+  .hb b { font-variant-numeric: tabular-nums; text-align: right; }
+  .kv { margin: 0.9rem 0 0; display: grid; gap: 0.5rem; font-size: 0.88rem; }
+  .kv div { display: grid; grid-template-columns: minmax(8rem, 15rem) 1fr; gap: 0.8rem; }
+  .kv dt { opacity: 0.7; } .kv dd { margin: 0; overflow-wrap: anywhere; }
+  @media (max-width: 560px) { .hb { grid-template-columns: 1fr 3rem; } .hb .nm { grid-column: 1 / -1; } .kv div { grid-template-columns: 1fr; gap: 0.1rem; } }
+</style>
+<main>
+  <section>
+    <h1>Can interpretability tools read the hidden word?</h1>
+    <p class="lede">Partly. They do well above chance, and best when pointed at the fine-tuned model as it is about to answer. No tool beats a strong model simply reading the essay.</p>
+    <p>Same checkpoint as the first page: <code>words300-n500</code> at step 50. Every number is how often a reader picks the secret from the essay's 8 candidates, where chance is 12.5%. Unless stated, each is 128 essays written by the trained sender (about ±4 points).</p>
+    <div class="sheet"><ul>
+      <li><b>Reading the essay's tokens, the tools get 30–66%.</b> The token lens and J-lens are weakest (30–38%). The NLA, oracle lens and activation oracle reach 62–66%, which sits between the 9B monitor (53%) and Haiku reading the text (73%).</li>
+      <li><b>Reading the fine-tuned model as it is about to answer, they get 76–80%.</b> Here the model has read the essay and been asked for the word, with no candidate list shown. The same readouts on the original model get 25–66%.</li>
+      <li><b>Sonnet (85%) and Opus (88%) reading the text still do better than any tool.</b> This sender mostly describes the word plainly, so there is little for a white-box tool to add.</li>
+      <li><b>On the <!--N6--> essays the original model cannot decode, the tools tie Sonnet and trail Opus.</b> Readouts on the fine-tuned model get 14–15; Sonnet gets 14 and Opus 17.</li>
+      <li><b>The fine-tuned model holds the word more often than it says it.</b> Asked with no list it names the secret 14% of the time, usually giving a near-synonym, while the J-lens at that position picks the secret 80% of the time.</li>
+      <li><b>The tools were built for the original model and work unchanged on the fine-tuned one.</b> On essay text the two give the same numbers; the fine-tune only shows up at the answer position.</li>
+    </ul></div>
+  </section>
+  <section>
+    <h2>Every reader on the same essays</h2>
+    <p>The thin vertical line is chance. The middle group reads only the essay, with no game prompt. The NLA and oracle lens in that group were pointed at the two sentences most related to the secret, which a real monitor could not do, so those two bars are a best case.</p>
+    <div class="sheet"><!--CHART--></div>
+  </section>
+  <section>
+    <h2>The essays that are actually hidden</h2>
+    <p>The original Qwen3.6-27B, given the receiver's prompt, picks the wrong word on <!--N6--> of the 128 essays. These are the closest thing this run has to concealed messages. With <!--N6--> essays each count is uncertain by about ±5.</p>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Reader</th><th>Correct</th></tr></thead>
+      <tbody><!--HARD--></tbody>
+    </table>
+    <p class="take">The subset was chosen by the original model failing, so readouts on the original model are low here by construction.</p></div>
+  </section>
+  <section>
+    <h2>Does the model hold the word without saying it?</h2>
+    <p>The model reads the essay, is told a word is hidden in it, and is asked to name it in one word. No candidates are shown. The J-lens is read at the last token before the answer.</p>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Measure</th><th>Trained essays, original model</th><th>Trained essays, fine-tuned</th><th>Untrained essays, original model</th><th>Untrained essays, fine-tuned</th></tr></thead>
+      <tbody><!--OPEN--></tbody>
+    </table>
+    <p class="take">The J-lens rows score each candidate by its first token, so the list is used at scoring time even though the model never saw it.</p></div>
+  </section>
+  <section>
+    <h2>Original model against fine-tuned model</h2>
+    <p>Each tool run on the original model's activations and on the fine-tuned model's. “Answer position” is the last token of the open question above.</p>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Readout</th><th>Trained essays, original</th><th>Trained essays, fine-tuned</th><th>Untrained essays, original</th><th>Untrained essays, fine-tuned</th></tr></thead>
+      <tbody><!--PAIRS--></tbody>
+    </table></div>
+    <h3>How far the fine-tune moved the activations</h3>
+    <p>Cosine similarity between the two models' activations on the same tokens; 1.00 means unchanged.</p>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Where</th><th>Layer 16</th><th>Layer 32</th><th>Layer 48</th><th>Layer 63</th></tr></thead>
+      <tbody><!--DRIFT--></tbody>
+    </table></div>
+  </section>
+  <section>
+    <h2>Five essays, and what each tool saw</h2>
+    <p>The highlight is the hint phrase. Tool text is quoted as produced and cut for length.</p>
+    <div class="essays"><!--CARDS--></div>
+  </section>
+  <section>
+    <h2>Limits</h2>
+    <div class="sheet"><ul>
+      <li><b>One checkpoint, one run.</b> Step 50 of a run where the sender was never pushed to hide from a reader with the same 8 candidates.</li>
+      <li><b>Layers were chosen on half the essays and scored on the other half.</b> The tools' own layers (NLA 42, oracle lens 45, activation oracle 32) were fixed in advance.</li>
+      <li><b>The lenses score a word by its first token,</b> so candidates that share a prefix, such as “surf” and “surfboard”, collide.</li>
+      <li><b>The hint-sentence picker was not checked for accuracy.</b> It missed the hint in at least one essay shown above.</li>
+      <li><b>The oracle lens was run with a guessed placeholder token,</b> not one confirmed against its authors' setup.</li>
+      <li><b>The open question's wording is ours</b> and the model was never trained on it.</li>
+      <li><b>Haiku read the essay with two different prompts</b> on the two pages: 73% here and 61% on the first page.</li>
+    </ul></div>
+  </section>
+  <footer><p>Run on 9 October 2026 on one H200. Tools: J-lens (Neuronpedia lens for Qwen3.6-27B), NLA verbalizer, oracle lens, activation oracle. Code in <code>src/cot_codenames/stego/lens.py</code>.</p></footer>
+</main>
