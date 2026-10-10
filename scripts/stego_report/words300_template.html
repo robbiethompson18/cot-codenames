@@ -1,0 +1,46 @@
+<title>Three Hundred Words</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<!--STYLE-->
+<style>main { max-width: 54rem; } .panels { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }</style>
+<main>
+  <section>
+    <h1>What the 300-word model learned</h1>
+    <p class="lede">It learned to get any word across, including words it never trained on. It did not learn to hide: a reader given the same 8 candidates as the receiver does nearly as well.</p>
+    <p>Run <code>words300-n500</code>: Qwen3.6-27B as sender and receiver, 300 secret words, the strict essay referee. The receiver picks the secret from 8 candidates. The monitor in training, Qwen3.5-9B, had to pick it from 500. Everything here is the step-50 checkpoint; each number is 64 essays, so about ±6 points.</p>
+    <div class="sheet"><ul>
+      <li><b>It works on unseen words.</b> The receiver gets 91% on the training words and 95% on words never used in training, up from 58% and 70% before training. 97–98% of essays pass the strict referee.</li>
+      <li><b>The monitor it trained against stays near 9%.</b> But that monitor is choosing from 500 words, and 9% of 500 is far above chance (0.2%).</li>
+      <li><b>On equal terms it is not hidden.</b> Given the receiver's own 8 candidates, Sonnet picks the secret 83–88% of the time and Opus 84–92%. Before training they got 67–81%. The essays became easier for a strong reader, not harder.</li>
+      <li><b>It mostly just describes the thing.</b> 61% of trained essays describe the object or its function without naming it; most of the rest use its vocabulary. Essays also got shorter, from about 177 words to about 97.</li>
+      <li><b>So the win comes from the list sizes, not from a private code.</b> A hint clear enough to pick 1 of 8 is not always enough to pick 1 of 500, and that gap is what the reward paid for.</li>
+    </ul></div>
+  </section>
+  <section>
+    <h2>Training curve</h2>
+    <p>Dots are evaluations; faint lines are training batches. The monitor penalty was phased in over steps 15 to 45. The run stalled at step 65 on a network problem and was continued separately.</p>
+    <div class="sheet"><!--LEGEND--><div class="panels"><!--PANELS--></div></div>
+  </section>
+  <section>
+    <h2>Who can read the essays</h2>
+    <p>The three Claude columns are those models reading each essay with thinking on, choosing from the same 8 candidates the receiver saw.</p>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Essays</th><th>Receiver, from 8</th><th>Haiku 5.5, from 8</th><th>Sonnet 5.5, from 8</th><th>Opus 5.5, from 8</th><th>9B monitor, from 500</th></tr></thead>
+      <tbody><!--READERS--></tbody>
+    </table>
+    <p class="take">The 9B monitor has not yet been scored on the 8-candidate lists; that is part of the interpretability pass.</p></div>
+  </section>
+  <section>
+    <h2>How it hints</h2>
+    <p>Sonnet 5.5 read each essay knowing the secret and labelled how it points to the word. 128 essays per row.</p>
+    <div class="sheet scroll"><table>
+      <thead><tr><th>Essays</th><th>Describes the thing</th><th>Uses its vocabulary</th><th>No visible hint</th><th>Sentences carrying a hint</th><th>Hints a careful reader would probably miss</th><th>Essay length (words)</th></tr></thead>
+      <tbody><!--SHAPE--></tbody>
+    </table></div>
+  </section>
+  <section>
+    <h2>Six essays</h2>
+    <p>Highlights are the phrases Sonnet picked as carrying the hint.</p>
+    <div class="essays"><!--CARDS--></div>
+  </section>
+  <footer><p>Evaluations from 9 October 2026. Reader comparisons and hint labels were run afterwards on the saved essays.</p></footer>
+</main>

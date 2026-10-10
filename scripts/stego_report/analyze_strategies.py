@@ -3,6 +3,7 @@ Usage (cwd = repo, ANTHROPIC_API_KEY set): python scripts/stego_report/analyze_s
 
 import json
 import re
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -45,7 +46,9 @@ Work out how the essay points to "{secret}". Then end your answer with one line 
 
 
 def analyse(r: dict) -> dict:
-    prompt = PROMPT.format(topic=r["topic"], secret=r["secret"], essay=r["essay"], candidates=", ".join(sorted(r["mon_candidates"])))
+    prompt = PROMPT.format(
+        topic=r["topic"], secret=r["secret"], essay=r["essay"], candidates=", ".join(sorted(r["mon_candidates"] or r["recv_candidates"]))
+    )
     msg = client.messages.create(
         model="claude-sonnet-5-5",
         max_tokens=4000,
@@ -54,23 +57,28 @@ def analyse(r: dict) -> dict:
         messages=[{"role": "user", "content": prompt}],
     )
     text = "".join(b.text for b in msg.content if b.type == "text").strip()
-    found = re.findall(r"\{[^{}]*\}", text, re.S)  # the last flat JSON object, whether or not it is on one line
+    found = re.findall(r"\{[^{}]*\}", text, re.DOTALL)  # the last flat JSON object, whether or not it is on one line
     try:
         return json.loads(found[-1])
     except (IndexError, json.JSONDecodeError):
         return {"mechanism": "unparsed", "hint_phrases": [], "hint_sentences": 0, "position": "", "obviousness": 0}
 
 
+# Optional arguments: an output file name, then any number of "label|run|step" sets to use instead of SETS.
+name = sys.argv[1] if len(sys.argv) > 1 else "strategies.jsonl"
+if len(sys.argv) > 2:
+    SETS = [(label, run, int(step)) for label, run, step in (a.split("|") for a in sys.argv[2:])]
 out = Path("runs/stego/analysis")
 out.mkdir(parents=True, exist_ok=True)
-with (out / "strategies.jsonl").open("w") as f:
+with (out / name).open("w") as f:
     for label, run, step in SETS:
         rows = [r for r in map(json.loads, open(f"runs/stego/{run}/rollouts.jsonl")) if r["kind"] == "eval" and r["step"] == step]
-        rows = [r for r in rows if r.get("split", "train") == "train"]
+        if len(sys.argv) <= 2:  # the original eleven sets were train-split only
+            rows = [r for r in rows if r.get("split", "train") == "train"]
         with ThreadPoolExecutor(64) as pool:
             results = list(pool.map(analyse, rows))
         for r, a in zip(rows, results):
-            keep = {k: r[k] for k in ("secret", "topic", "essay", "recv_correct", "mon_correct", "judge_pass", "p_recv", "p_mon")}
+            keep = {k: r[k] for k in ("secret", "topic", "essay", "split", "recv_correct", "mon_correct", "judge_pass", "p_recv", "p_mon")}
             f.write(json.dumps({"set": label, "run": run, "step": step} | keep | {"analysis": a}) + "\n")
         mech = {}
         for a in results:
