@@ -61,6 +61,8 @@ button.opt small { font: 12px var(--mono); opacity: .7; margin-left: 4px; }
 mark { background: var(--t0); color: var(--ink); border-radius: 3px; padding: 0 2px; font-weight: 600; }
 .nla { font-size: 13.5px; color: var(--ink2); white-space: pre-wrap; overflow-wrap: anywhere; }
 .hint { color: var(--muted); font-size: 14px; }
+.notes ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; max-width: 78ch; color: var(--ink2); }
+.notes b { color: var(--ink); font-weight: 600; }
 @media (max-width: 820px) { .main { grid-template-columns: minmax(0, 1fr); } #panel { position: static; max-height: none; } }
 </style>
 
@@ -88,14 +90,29 @@ mark { background: var(--t0); color: var(--ink); border-radius: 3px; padding: 0 
       <div class="essay-head" id="head"></div>
       <div id="essay"></div>
       <div class="legend">
-        <span><i class="sw" style="background:var(--t0)"></i>Secret is the top word of 51 here</span>
-        <span><i class="sw" style="background:var(--t1)"></i>2nd or 3rd</span>
-        <span><i class="sw" style="background:var(--t2)"></i>4th to 6th</span>
+        <span><i class="sw" style="background:var(--t0)"></i>Secret is the top word of 51 here (2% of tokens by chance)</span>
+        <span><i class="sw" style="background:var(--t1)"></i>2nd or 3rd (4% by chance)</span>
         <span><i class="sw" style="border-bottom:2px solid var(--mark);border-radius:0;height:10px"></i>Secret is in the lens's top 5 of the whole vocabulary</span>
         <span><u style="text-decoration:underline dotted;text-underline-offset:4px">abc</u>&nbsp;NLA text names the secret</span>
       </div>
     </div>
     <div class="box" id="panel"><p class="hint">Hover over a token, or click one to pin it.</p></div>
+  </div>
+
+  <div class="box notes">
+    <h2>What the numbers say</h2>
+    <ul>
+      <li><b>The signal is real but weak.</b> In hidden-word essays the secret is the top word of 51 at about 8% of tokens, against 2% by chance. Ranking each word by its best token, the secret comes first in 35% of trained-sender essays and 27% of untrained-sender essays.</li>
+      <li><b>No-secret essays sit at chance.</b> These were written from the topic alone, with no secret word and no game, and are scored against a word their writer never saw. The secret is top at 2.3% of tokens and comes first in 3% of essays. Tinted tokens in those essays are what chance looks like: about 6% of tokens are tinted with no signal at all, and some essays have many more by coincidence.</li>
+      <li><b>The original and fine-tuned readers are the same.</b> Every figure matches within 2 points. The fine-tuned receiver does not decode the word any more readily than a model that never played the game, so the signal comes from the essay describing the word.</li>
+      <li><b>Training against the 9B monitor did not hide the word from the lens.</b> Trained-sender essays score higher by best token (35% against 27%) and lower by average over the essay (12% against 20%). Each figure is uncertain by about 9 points.</li>
+      <li><b>It is not obvious without the list of 51.</b> In the 40 essays here, the secret is in the lens's top 5 of the whole vocabulary at 6 of 1,539 tokens for trained-sender essays and 21 of 2,181 for untrained.</li>
+      <li><b>The NLA shows nothing.</b> Its text names the secret at 0.4% of tokens, the same rate as it names any other word of the 51.</li>
+      <li><b>Where:</b> the signal builds through the essay and peaks 60–70% of the way in for trained-sender essays, then drops at the end.</li>
+      <li><b>Which layer:</b> it is present early and nearly flat from layer 24 on, peaking around layer 48.</li>
+      <li><b>"At least one top token" is useless as a detector.</b> It is true of 95% of trained-sender essays and 63% of no-secret essays.</li>
+      <li><b>Scoring:</b> each word's score is centred on its own average over the essays of other secrets, so a common word does not win everywhere.</li>
+    </ul>
   </div>
 </div>
 
@@ -109,7 +126,7 @@ const cache = {};
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pct = x => (x * 100).toFixed(x < 0.1 ? 1 : 0) + "%";
-const cls = rk => rk === 0 ? "r0" : rk <= 2 ? "r1" : rk <= 5 ? "r2" : "";
+const cls = rk => rk === 0 ? "r0" : rk <= 2 ? "r1" : "";
 const names = (text, secret) => new RegExp("\\b" + secret + "\\b", "i").test(text);
 
 function buttons(id, items, current, pick) {
