@@ -1,0 +1,194 @@
+<title>Hidden Word Viewer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@400&display=swap">
+<style>
+/* Layout: summary table on top, then a reading pane (essay, tokens tinted by the secret's rank) beside a sticky token inspector. */
+:root {
+  --bg: #f7f8fa; --panel: #ffffff; --ink: #18202b; --ink2: #556070; --muted: #8a94a3; --grid: #e3e7ed; --rule: #cfd5de;
+  --t0: #f2a23a; --t1: #f8cf8e; --t2: #fcebcf; --mark: #2b6cb0; --sel: #18202b;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --serif: "IBM Plex Serif", Georgia, serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12161c; --panel: #1a2029; --ink: #e8ecf2; --ink2: #a9b3c1; --muted: #7b8696; --grid: #2a323e; --rule: #3a4452;
+  --t0: #a8660f; --t1: #6b4514; --t2: #3d2d17; --mark: #6fb0f0; --sel: #e8ecf2; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12161c; --panel: #1a2029; --ink: #e8ecf2; --ink2: #a9b3c1; --muted: #7b8696; --grid: #2a323e; --rule: #3a4452;
+  --t0: #a8660f; --t1: #6b4514; --t2: #3d2d17; --mark: #6fb0f0; --sel: #e8ecf2; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 32px 56px; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-size: 24px; line-height: 1.2; font-weight: 600; margin: 0; text-wrap: balance; }
+h2 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin: 0 0 6px; }
+p { margin: 0; }
+.lede { color: var(--ink2); max-width: 72ch; }
+.box { background: var(--panel); border: 1px solid var(--grid); border-radius: 8px; padding: 16px 18px; min-width: 0; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+th { font-weight: 500; color: var(--ink2); font-size: 13px; }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+.spark { display: inline-flex; align-items: flex-end; gap: 2px; height: 22px; }
+.spark i { width: 7px; background: var(--t0); border-radius: 2px 2px 0 0; min-height: 1px; }
+.controls { display: flex; flex-direction: column; gap: 10px; }
+.ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.ctl > span { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 4.5rem; }
+button.opt { font: 500 13px var(--sans); color: var(--ink2); background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+button.opt[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button.opt:focus-visible, .tk:focus-visible { outline: 2px solid var(--mark); outline-offset: 1px; }
+button.opt small { font: 12px var(--mono); opacity: .7; margin-left: 4px; }
+.main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.essay-head { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 14px; color: var(--ink2); margin-bottom: 12px; }
+.essay-head b { color: var(--ink); font-weight: 600; }
+#essay { font-family: var(--serif); font-size: 16px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tk { border-radius: 3px; cursor: pointer; padding-block: 2px; }
+.tk.r0 { background: var(--t0); } .tk.r1 { background: var(--t1); } .tk.r2 { background: var(--t2); }
+.tk.jl { border-bottom: 2px solid var(--mark); }
+.tk.nl { text-decoration: underline dotted var(--ink); text-underline-offset: 5px; }
+.tk.on { outline: 2px solid var(--sel); outline-offset: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink2); margin-top: 14px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
+#panel { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 24px); overflow-y: auto; }
+#panel .tok { font: 500 16px var(--mono); overflow-wrap: anywhere; }
+.ranks { display: flex; flex-wrap: wrap; gap: 6px; }
+.ranks div { font: 12px var(--mono); border: 1px solid var(--grid); border-radius: 5px; padding: 3px 7px; }
+.ranks div.r0 { background: var(--t0); } .ranks div.r1 { background: var(--t1); } .ranks div.r2 { background: var(--t2); }
+.lens { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-size: 14px; }
+.lens dt { font: 12px var(--mono); color: var(--muted); padding-top: 2px; }
+.lens dd { margin: 0; overflow-wrap: anywhere; }
+mark { background: var(--t0); color: var(--ink); border-radius: 3px; padding: 0 2px; font-weight: 600; }
+.nla { font-size: 13.5px; color: var(--ink2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.hint { color: var(--muted); font-size: 14px; }
+@media (max-width: 820px) { .main { grid-template-columns: minmax(0, 1fr); } #panel { position: static; max-height: none; } }
+</style>
+
+<div class="wrap">
+  <h1>Does the hidden word show up in a model that just reads the essay?</h1>
+  <p class="lede">A model reads the essay with no mention of a hidden word. At every token, the Jacobian lens scores the secret against 50 other words the essay never uses. By chance the secret would be the top word of the 51 at 2% of tokens.</p>
+
+  <div class="box scroll">
+    <h2>Summary, fine-tuned reader, layer 48, 100 essays per row</h2>
+    <table>
+      <thead><tr><th>Essays</th><th>Secret is the top word of 51, by each word's best token</th><th>…by its average over the essay</th><th>Share of tokens where the secret is top</th><th>Where in the essay (tenths)</th></tr></thead>
+      <tbody id="summary"></tbody>
+    </table>
+  </div>
+
+  <div class="controls">
+    <div class="ctl"><span>Essays</span><div class="ctl" id="sets"></div></div>
+    <div class="ctl"><span>Essay</span><div class="ctl" id="list"></div></div>
+    <div class="ctl"><span>Reader</span><div class="ctl" id="readers"></div></div>
+    <div class="ctl"><span>Tint layer</span><div class="ctl" id="layers"></div></div>
+  </div>
+
+  <div class="main">
+    <div class="box">
+      <div class="essay-head" id="head"></div>
+      <div id="essay"></div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--t0)"></i>Secret is the top word of 51 here</span>
+        <span><i class="sw" style="background:var(--t1)"></i>2nd or 3rd</span>
+        <span><i class="sw" style="background:var(--t2)"></i>4th to 6th</span>
+        <span><i class="sw" style="border-bottom:2px solid var(--mark);border-radius:0;height:10px"></i>Secret is in the lens's top 5 of the whole vocabulary</span>
+        <span><u style="text-decoration:underline dotted;text-underline-offset:4px">abc</u>&nbsp;NLA text names the secret</span>
+      </div>
+    </div>
+    <div class="box" id="panel"><p class="hint">Hover over a token, or click one to pin it.</p></div>
+  </div>
+</div>
+
+<script>
+const D = /*DATA*/;
+const SETS = [["trained", "Trained sender, hidden word"], ["untrained", "Untrained sender, hidden word"],
+              ["plain-trained", "Trained model, no secret"], ["plain-untrained", "Untrained model, no secret"]];
+const READERS = [["lora", "Fine-tuned 27B"], ["base", "Original 27B"]];
+const st = { set: "trained", i: null, reader: "lora", layer: 48, t: null, pinned: false, doc: null };
+const cache = {};
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = x => (x * 100).toFixed(x < 0.1 ? 1 : 0) + "%";
+const cls = rk => rk === 0 ? "r0" : rk <= 2 ? "r1" : rk <= 5 ? "r2" : "";
+const names = (text, secret) => new RegExp("\\b" + secret + "\\b", "i").test(text);
+
+function buttons(id, items, current, pick) {
+  $(id).innerHTML = items.map(([v, label, extra]) =>
+    `<button class="opt" id="${id}-${v}" data-v="${v}" aria-pressed="${String(v) === String(current)}">${esc(label)}${extra ? `<small>${extra}</small>` : ""}</button>`).join("");
+  $(id).onclick = e => { const b = e.target.closest("button"); if (b) pick(b.dataset.v); };
+}
+
+function summary() {
+  const top = Math.max(...D.summary.flatMap(c => c.where));
+  $("summary").innerHTML = SETS.map(([key, label]) => {
+    const c = D.summary.find(x => x.sender === key && x.reader === "lora");
+    const bars = c.where.map(v => `<i style="height:${Math.max(1, v / top * 22)}px" title="${pct(v)}"></i>`).join("");
+    return `<tr><td>${label}</td><td class="n">${pct(c.best)}</td><td class="n">${pct(c.avg)}</td><td class="n">${pct(c.tokens)}</td><td><span class="spark">${bars}</span></td></tr>`;
+  }).join("");
+}
+
+function controls() {
+  buttons("sets", SETS, st.set, v => { st.set = v; st.i = null; controls(); });
+  const mine = D.essays.filter(e => e.sender === st.set);
+  if (st.i === null) st.i = mine[0].i;
+  buttons("list", mine.map(e => [e.i, e.secret, pct(e.hot)]), st.i, v => { st.i = +v; controls(); });
+  buttons("readers", READERS, st.reader, v => { st.reader = v; controls(); });
+  buttons("layers", D.token_layers.map(l => [l, "Layer " + l]), st.layer, v => { st.layer = +v; controls(); });
+  load();
+}
+
+function load() {
+  const i = st.i;
+  const ready = doc => { if (st.i !== i) return; if (st.doc !== doc) { st.t = null; st.pinned = false; } st.doc = doc; essay(); panel(); };
+  if (cache[i]) return ready(cache[i]);
+  $("essay").textContent = "Loading…";
+  fetch(`data/${i}.json`).then(r => r.json()).then(doc => { cache[i] = doc; ready(doc); })
+    .catch(() => { $("essay").textContent = "Could not load this essay's data."; });
+}
+
+function essay() {
+  const doc = st.doc, R = doc.readers[st.reader], li = D.token_layers.indexOf(st.layer);
+  const plain = doc.sender.startsWith("plain");
+  $("head").innerHTML = `<span>${plain ? "Scored against" : "Secret"}: <b>${esc(doc.secret)}</b>${plain ? " (the writer never saw it)" : ""}</span><span>Topic: ${esc(doc.topic)}</span>`;
+  let h = "", at = 0;
+  doc.spans.forEach(([a, b], t) => {
+    if (a > at) h += esc(doc.essay.slice(at, a));
+    const lens = Object.values(R.top).some(per => per[t].includes(doc.secret));
+    const c = [cls(R.rank[li][t]), lens ? "jl" : "", names(R.nla[t], doc.secret) ? "nl" : "", t === st.t ? "on" : ""].join(" ");
+    h += `<span class="tk ${c}" data-t="${t}" tabindex="0">${esc(doc.essay.slice(a, b))}</span>`;
+    at = b;
+  });
+  $("essay").innerHTML = h + esc(doc.essay.slice(at));
+}
+
+function panel() {
+  const doc = st.doc, t = st.t;
+  if (t === null) { $("panel").innerHTML = '<p class="hint">Hover over a token, or click one to pin it.</p>'; return; }
+  const R = doc.readers[st.reader], [a, b] = doc.spans[t];
+  const mark = s => esc(s).replace(new RegExp("\\b(" + doc.secret + ")\\b", "gi"), "<mark>$1</mark>");
+  const ranks = D.token_layers.map((l, k) => `<div class="${cls(R.rank[k][t])}">L${l} · #${R.rank[k][t] + 1}</div>`).join("");
+  const lens = Object.entries(R.top).map(([l, per]) =>
+    `<dt>L${l}</dt><dd>${per[t].map(w => w === doc.secret ? `<mark>${esc(w)}</mark>` : esc(w)).join(", ") || "–"}</dd>`).join("");
+  $("panel").innerHTML = `
+    <div><h2>Token ${t + 1} of ${doc.spans.length}${st.pinned ? " · pinned" : ""}</h2><div class="tok">“${esc(doc.essay.slice(a, b))}”</div></div>
+    <div><h2>Rank of “${esc(doc.secret)}” among 51 words, by layer</h2><div class="ranks">${ranks}</div></div>
+    <div><h2>Jacobian lens, top words of the whole vocabulary</h2><dl class="lens">${lens}</dl></div>
+    <div><h2>NLA at layer 42</h2><div class="nla">${mark(R.nla[t])}</div></div>`;
+}
+
+function select(t, pin) {
+  if (pin) { st.pinned = !(st.pinned && st.t === t); } else if (st.pinned) return;
+  st.t = t;
+  document.querySelectorAll(".tk.on").forEach(e => e.classList.remove("on"));
+  const el = document.querySelector(`.tk[data-t="${t}"]`); if (el) el.classList.add("on");
+  panel();
+}
+const tokenOf = e => { const el = e.target.closest(".tk"); return el ? +el.dataset.t : null; };
+$("essay").addEventListener("mouseover", e => { const t = tokenOf(e); if (t !== null) select(t, false); });
+$("essay").addEventListener("focusin", e => { const t = tokenOf(e); if (t !== null) select(t, false); });
+$("essay").addEventListener("click", e => { const t = tokenOf(e); if (t !== null) select(t, true); });
+$("essay").addEventListener("keydown", e => { const t = tokenOf(e); if (t !== null && e.key === "Enter") select(t, true); });
+
+summary();
+controls();
+</script>
