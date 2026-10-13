@@ -20,9 +20,8 @@ Results: If you freeze the model you're using, prompting-based methods outperfor
 methods. If you freeze the methods you're using (internals vs prompting-based), the fine-tuned model
 outperforms the stock model.
 
-Takeaways: A model can fairly quickly learn steganography that fools the base it was finetuned from.
-This suggests a future research direction: how quickly do you need to retrain your monitors as your
-model trains?
+Takeaways: mostly unexciting. Metamodels are worse than prompting. The organism doesn't learn any
+very creative steganography; it mostly just goes off on tangents relating to the hidden word.
 
 ## Training the Organism:
 
@@ -101,14 +100,17 @@ We also ran the test with no hint: the model reads the bare essay, and at every 
 against 2% by chance, the stock and fine-tuned readers score the same, and the NLA names the secret
 no more often than the other 50 words.
 
-## Graphs Showing metamodel success by layer
+## Suspicious essay detection
 
-@c NLA graph @c Jlens graph
+I had Claude train a bunch of methods to detect whether the essay contains a hidden word at all.
+Many stupid things have AUROC close to 1, including sorting by essay length and training a linear
+probe, while fun methods like looking at J-lens activations for the word 'hidden' have AUROC ~.6.
 
 ## Caveats
 
 Our measure of 'uplift from NLA' is an underestimate: we don't retrain the NLA on the RLed model, we
-just use [Celeste's NLA](https://huggingface.co/ceselder/qwen3.6-27b-nla-av) on the OOTB model.
+just use [Celeste's NLA](https://huggingface.co/ceselder/qwen3.6-27b-nla-av) on the OOTB model. This
+NLA works horribly, so I didn't try very hard to make it better.
 
 ## Steganogaphic Methods
 
