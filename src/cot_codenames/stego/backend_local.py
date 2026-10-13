@@ -179,17 +179,33 @@ class LocalBackend:
         return (full / full.sum(-1, keepdim=True)).tolist()
 
     @torch.no_grad()
-    def label_prob(self, role: str, chats: list[Chat], answers: list[str]) -> list[tuple[float, bool]]:
+    def label_prob(self, role: str, chats: list[Chat], answers: list[str], prefill: str = "") -> list[tuple[float, bool]]:
         """For candidate lists too long for one-letter labels: the probability the chooser gives to `answers[i]` as its
-        whole reply, and whether greedy decoding would produce exactly that reply. One teacher-forced pass."""
+        whole reply, and whether greedy decoding would produce exactly that reply. One teacher-forced pass.
+        With `prefill` (--open-vocab) the reply is started with that text and the answer is a word, closed by a quote."""
         if role == "monitor" and self.monitor is not None:
-            return self._label_prob(self.monitor, self.mon_tok, chats, answers)
+            return self._label_prob(self.monitor, self.mon_tok, chats, answers, prefill)
         if role == "monitor":
             with self._base() as base:
-                return self._label_prob(base, self.tok, chats, answers)
-        return self._label_prob(self.policy, self.tok, chats, answers)
+                return self._label_prob(base, self.tok, chats, answers, prefill)
+        return self._label_prob(self.policy, self.tok, chats, answers, prefill)
 
-    def _label_prob(self, model, tok, chats: list[Chat], answers: list[str]) -> list[tuple[float, bool]]:
+    def _answer_rows(self, tok, chats: list[Chat], answers: list[str], prefill: str) -> tuple[torch.Tensor, torch.Tensor, list[list[int]]]:
+        """Left-padded token rows of prompt + answer, so every answer ends at the last position; plus the answers' ids."""
+        if prefill:  # the word, then the closing quote, tokenised apart so the quote never merges into the word
+            answer_ids = [tok.encode(a, add_special_tokens=False) + tok.encode('"', add_special_tokens=False) for a in answers]
+        else:  # the end-of-turn token is part of the answer, so "13" is not credited when the model was going to say "137"
+            answer_ids = [tok.encode(a, add_special_tokens=False) + [tok.eos_token_id] for a in answers]
+        rows = [tok(_render(tok, c) + prefill, add_special_tokens=False).input_ids + ids for c, ids in zip(chats, answer_ids)]
+        width = max(map(len, rows))
+        ids = torch.full((len(rows), width), tok.pad_token_id, device=self.device)
+        attn = torch.zeros((len(rows), width), dtype=torch.long, device=self.device)
+        for i, row in enumerate(rows):
+            ids[i, width - len(row) :] = torch.tensor(row)
+            attn[i, width - len(row) :] = 1
+        return ids, attn, answer_ids
+
+    def _label_prob(self, model, tok, chats: list[Chat], answers: list[str], prefill: str = "") -> list[tuple[float, bool]]:
         # The model returns logits for every position over the whole vocabulary (about 0.5 MB per token), and a
         # 500-candidate prompt is about 4,000 tokens, so these go through a few thousand tokens at a time. Batching them
         # like ordinary prompts asked for 60 GB in one allocation.
@@ -197,15 +213,8 @@ class LocalBackend:
         size = max(1, min(self.args.score_batch, 6000 // longest))
         out = []
         for batch in self._batches(list(zip(chats, answers)), size):
-            # The end-of-turn token is part of the answer, so "13" is not credited when the model was going to say "137".
-            answer_ids = [tok.encode(a, add_special_tokens=False) + [tok.eos_token_id] for _, a in batch]
-            rows = [tok(_render(tok, c), add_special_tokens=False).input_ids + ids for (c, _), ids in zip(batch, answer_ids)]
-            width = max(map(len, rows))
-            ids = torch.full((len(rows), width), tok.pad_token_id, device=self.device)
-            attn = torch.zeros((len(rows), width), dtype=torch.long, device=self.device)
-            for i, row in enumerate(rows):  # left-padded, so every answer ends at the last position
-                ids[i, width - len(row) :] = torch.tensor(row)
-                attn[i, width - len(row) :] = 1
+            ids, attn, answer_ids = self._answer_rows(tok, [c for c, _ in batch], [a for _, a in batch], prefill)
+            width = ids.shape[1]
             logits = model(input_ids=ids, attention_mask=attn).logits
             for i, answer in enumerate(answer_ids):
                 # The token at position t is predicted from position t - 1. Only those few positions are normalised.
@@ -215,7 +224,7 @@ class LocalBackend:
                 out.append((float(torch.tensor(total).exp()), bool((steps.argmax(-1) == target).all())))
         return out
 
-    def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, int]]) -> dict[str, float]:
+    def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, Any]]) -> dict[str, float]:
         self.opt.zero_grad()
         # Sampling and scoring leave large cached blocks behind; without this the first backward pass runs out of memory.
         if self.device == "cuda":
@@ -250,7 +259,19 @@ class LocalBackend:
             loss.backward()
             loss_pg += pg.item()
         # Receiver: cross-entropy on the letter of the true secret, through the same LoRA.
-        for batch in self._batches(receiver, self.args.micro_batch):
+        for batch in self._batches(receiver, self.args.micro_batch) if self.args.open_vocab else []:
+            # --open-vocab: cross-entropy on the secret word itself after the started reply, no candidate list.
+            ids, attn, answer_ids = self._answer_rows(self.tok, [c for c, _ in batch], [w for _, w in batch], game.OPEN_REPLY)
+            logits, width = self.policy(input_ids=ids, attention_mask=attn).logits, ids.shape[1]
+            ce = torch.stack(
+                [
+                    F.cross_entropy(logits[i, width - len(a) - 1 : width - 1].float(), torch.tensor(a, device=self.device), reduction="sum")
+                    for i, a in enumerate(answer_ids)
+                ]
+            ).sum() / len(receiver)
+            ce.backward()
+            loss_recv += ce.item()
+        for batch in [] if self.args.open_vocab else self._batches(receiver, self.args.micro_batch):
             n_labels = max(i for _, i in receiver) + 1
             label_ids = torch.tensor(self._label_ids(self.tok, n_labels), device=self.device)
             logits = self._next_logits(self.policy, self.tok, [c for c, _ in batch], len(batch))

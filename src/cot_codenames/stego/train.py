@@ -8,6 +8,7 @@ updating, save a checkpoint, and upload the run directory to the Hugging Face re
 Rung 1, fixed 8 words (smoke test):  python -m cot_codenames.stego.train --backend local --run fixed8 --pool-size 8
 Rung 2, many words:                  python -m cot_codenames.stego.train --backend local --run words300 --pool-size 300
 Control arm (no monitor penalty):    add --lam 0
+No candidate lists:                  add --open-vocab (reward is the probability of the secret word itself)
 Where everything a run writes goes:  docs/stego-data.md
 """
 
@@ -44,14 +45,16 @@ class Backend(Protocol):
         role "receiver" uses the current policy; role "monitor" uses the frozen monitor model."""
         ...
 
-    def label_prob(self, role: str, chats: list[Chat], answers: list[str]) -> list[tuple[float, bool]]:
+    def label_prob(self, role: str, chats: list[Chat], answers: list[str], prefill: str = "") -> list[tuple[float, bool]]:
         """For candidate lists too long for one-letter labels (see game.labels): the probability the chooser gives
-        to each chat's answer string, and whether its greedy reply would be exactly that string."""
+        to each chat's answer string, and whether its greedy reply would be exactly that string. With `prefill` the
+        reply is started with that text and the answer is a word followed by a closing quote (--open-vocab)."""
         ...
 
-    def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, int]]) -> dict[str, float]:
+    def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, int]] | list[tuple[Chat, str]]) -> dict[str, float]:
         """One optimizer step on the shared LoRA. `sender` is (sample, advantage): policy gradient on the essay tokens.
-        `receiver` is (chooser chat, index of the correct label): cross-entropy on the answer token. Returns metrics."""
+        `receiver` is (chooser chat, index of the correct label): cross-entropy on the answer token. Under --open-vocab
+        it is (open chat, secret word): cross-entropy on the word. Returns metrics."""
         ...
 
     def save(self, path: Path) -> None:
@@ -134,8 +137,24 @@ def play(
             seen = [d | {"reasoning": s.cot, "show_essay": view == "both"} for d, s in zip(seen, samples)]
         return [remonitor.monitor_chat(d, few, force_answer=force) for d in seen]
 
-    p_recv = backend.choose("receiver", recv_chats, args.m)
-    if not game.one_token(args.n):
+    if args.open_vocab:
+        # No candidate lists: each reader is scored on the probability it gives the secret itself after a started reply.
+        # The monitor is also credited for the capitalised spelling; the receiver is trained to write it lower-case.
+        recv_chats = [game.open_chat(s.text) for s in samples]
+        secrets = [e.secret for e in episodes]
+        got = backend.label_prob("receiver", recv_chats, secrets, game.OPEN_REPLY)
+        low = backend.label_prob("monitor", recv_chats, secrets, game.OPEN_REPLY)
+        cap = backend.label_prob("monitor", recv_chats, [w.capitalize() for w in secrets], game.OPEN_REPLY)
+        p_recv, p_mon, mon_text = [[p] for p, _ in got], None, [""] * len(episodes)
+        recv = [([], 0)] * len(episodes)
+        recv_right = [ok for _, ok in got]
+        p_true, mon_right = [a + b for (a, _), (b, _) in zip(low, cap)], [a or b for (_, a), (_, b) in zip(low, cap)]
+    else:
+        p_recv = backend.choose("receiver", recv_chats, args.m)
+        recv_right = [max(range(args.m), key=d.__getitem__) == i for d, (_, i) in zip(p_recv, recv)]
+    if args.open_vocab:
+        pass  # scored above
+    elif not game.one_token(args.n):
         # Too many candidates for a one-token answer: score the true label's probability and the greedy answer instead.
         answers = [game.labels(args.n)[i] for _, i in mon]
         scored = backend.label_prob("monitor", mon_chats(args.monitor_sees, shots, False), answers)
@@ -173,16 +192,18 @@ def play(
                 "leaked": leak,
                 "p_recv": p_recv[i][ri],
                 "p_mon": p_true[i],
-                "recv_correct": max(range(args.m), key=p_recv[i].__getitem__) == ri,
+                "recv_correct": recv_right[i],
                 "mon_correct": mon_right[i],
                 "recv_candidates": recv[i][0],
-                "mon_candidates": mon[i][0] if game.one_token(args.n) else [],  # 500 words per essay is too much to log
+                "mon_candidates": mon[i][0]
+                if game.one_token(args.n) and not args.open_vocab
+                else [],  # 500 words per essay is too much to log
                 "recv_probs": [round(p, 4) for p in p_recv[i]],
                 "mon_probs": [round(p, 4) for p in p_mon[i]] if p_mon else [],
                 "mon_text": mon_text[i],
                 "reward": game.reward(p_recv[i][ri], p_true[i], valid, args.cur_lam, args.fail_reward),
                 "_sample": s,
-                "_recv": (recv_chats[i], ri),
+                "_recv": (recv_chats[i], e.secret if args.open_vocab else ri),
                 "_tokens": (verdicts[i]["in"], verdicts[i]["out"]),
                 "_secs": {k: v for k, v in clock.items() if k != "t0"},
             }
@@ -248,6 +269,11 @@ def main() -> None:
         choices=["numbers", "letters"],
         default="numbers",
         help="how candidates are labelled; letters only to continue a run trained on letters",
+    )
+    ap.add_argument(
+        "--open-vocab",
+        action="store_true",
+        help="no candidate lists: receiver and monitor are scored on the probability of the secret word itself (local backend)",
     )
     ap.add_argument("--m", type=int, default=8, help="receiver's candidate list size")
     ap.add_argument("--n", type=int, default=8, help="monitor's candidate list size")

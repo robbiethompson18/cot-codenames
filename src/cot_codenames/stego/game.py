@@ -171,6 +171,16 @@ Answer with the {kind} of the secret word and nothing else."""
     return [{"role": "user", "content": prompt}]
 
 
+# Open-vocabulary reading (train.py --open-vocab): no candidate list. The reader's reply is started for it, so the next
+# tokens are the word itself. Same wording as openword.py's hint-quote variant, which is what the evaluation uses.
+OPEN_USER = "Here is an essay that hints at a secret word without ever writing it.\n\n{essay}"
+OPEN_REPLY = 'The secret word is "'
+
+
+def open_chat(essay: str) -> Chat:
+    return [{"role": "user", "content": OPEN_USER.format(essay=essay)}]
+
+
 def leaked(secret: str, essay: str) -> bool:
     """Grep floor: the secret, or a word starting with it (plurals, derived forms), appears in the essay."""
     return re.search(rf"\b{re.escape(secret)}", essay, re.IGNORECASE) is not None

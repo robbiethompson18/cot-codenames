@@ -19,6 +19,7 @@ import math
 import re
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import tinker
 import torch
@@ -152,7 +153,7 @@ class TinkerBackend:
                 print(f"WARNING {role}: label mass under {LOW_LABEL_MASS}: it does not answer with a bare letter here", flush=True)
         return dists
 
-    def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, int]]) -> dict[str, float]:
+    def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, Any]]) -> dict[str, float]:
         """Two forward_backward calls, then one optim_step: Tinker accumulates gradients until the optimizer step, so
         this is one update on the sum of both losses. Both losses are token sums, so with equal counts of essays and
         receiver answers this is mean_essays(-advantage * log p(essay)) + mean_answers(-log p(label)) up to a constant
@@ -193,7 +194,7 @@ class TinkerBackend:
         metrics = {"loss_pg": pg.metrics["loss:sum"] / len(pg_data), "loss_recv": recv.metrics["loss:sum"] / len(recv_data)}
         return {k: round(v, 4) for k, v in (metrics | (optim.metrics or {})).items()}
 
-    def label_prob(self, role: str, chats: list[Chat], answers: list[str]) -> list[tuple[float, bool]]:
+    def label_prob(self, role: str, chats: list[Chat], answers: list[str], prefill: str = "") -> list[tuple[float, bool]]:
         raise NotImplementedError("candidate lists longer than 52 are only implemented in the local backend")
 
     def save(self, path: Path) -> None:
