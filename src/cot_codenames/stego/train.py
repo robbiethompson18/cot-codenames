@@ -48,7 +48,7 @@ class Backend(Protocol):
     def label_prob(self, role: str, chats: list[Chat], answers: list[str], prefill: str = "") -> list[tuple[float, bool]]:
         """For candidate lists too long for one-letter labels (see game.labels): the probability the chooser gives
         to each chat's answer string, and whether its greedy reply would be exactly that string. With `prefill` the
-        reply is started with that text and the answer is a word followed by a closing quote (--open-vocab)."""
+        reply is started with that text and the answer is the word that follows (--open-vocab)."""
         ...
 
     def step(self, sender: list[tuple[Sample, float]], receiver: list[tuple[Chat, int]] | list[tuple[Chat, str]]) -> dict[str, float]:

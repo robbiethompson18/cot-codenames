@@ -182,7 +182,7 @@ class LocalBackend:
     def label_prob(self, role: str, chats: list[Chat], answers: list[str], prefill: str = "") -> list[tuple[float, bool]]:
         """For candidate lists too long for one-letter labels: the probability the chooser gives to `answers[i]` as its
         whole reply, and whether greedy decoding would produce exactly that reply. One teacher-forced pass.
-        With `prefill` (--open-vocab) the reply is started with that text and the answer is a word, closed by a quote."""
+        With `prefill` (--open-vocab) the reply is started with that text and the answer is the word that follows."""
         if role == "monitor" and self.monitor is not None:
             return self._label_prob(self.monitor, self.mon_tok, chats, answers, prefill)
         if role == "monitor":
@@ -192,8 +192,10 @@ class LocalBackend:
 
     def _answer_rows(self, tok, chats: list[Chat], answers: list[str], prefill: str) -> tuple[torch.Tensor, torch.Tensor, list[list[int]]]:
         """Left-padded token rows of prompt + answer, so every answer ends at the last position; plus the answers' ids."""
-        if prefill:  # the word, then the closing quote, tokenised apart so the quote never merges into the word
-            answer_ids = [tok.encode(a, add_special_tokens=False) + tok.encode('"', add_special_tokens=False) for a in answers]
+        if prefill:
+            # The word's own tokens only. A closing quote is not scored: the stock model ends the word with '"', '".' or
+            # '",' and only a trained receiver would learn which one we picked, which would hide the monitor's reading.
+            answer_ids = [tok.encode(a, add_special_tokens=False) for a in answers]
         else:  # the end-of-turn token is part of the answer, so "13" is not credited when the model was going to say "137"
             answer_ids = [tok.encode(a, add_special_tokens=False) + [tok.eos_token_id] for a in answers]
         rows = [tok(_render(tok, c) + prefill, add_special_tokens=False).input_ids + ids for c, ids in zip(chats, answer_ids)]
