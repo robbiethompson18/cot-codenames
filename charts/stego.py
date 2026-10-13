@@ -5,7 +5,8 @@ Data:
 - training.json: per-step training metrics of the 300-word run (cot-codenames runs words300-n500 and its continuation
   words300-n500-b), 64 essays per step.
 - READERS / UPLIFT: hits out of 100 essays from the fine-tuned sender, no candidate list
-  (cot-codenames runs/stego/openword/hint-quote/table.json).
+  (cot-codenames runs/stego/openword/hint-quote/table.json). The J-lens rows are layer 42, the layer the NLA reads.
+- jlens-layers.json: J-lens hits at every layer on those 100 essays (runs/stego/openword/hint-quote/read.jsonl).
 """
 
 import json
@@ -48,17 +49,17 @@ def training():
 # (reader, first guess, in first ten) out of 100 essays from the fine-tuned sender
 READERS = [
     ("Fine-tuned 27B, next token", 23, 47),
-    ("Fine-tuned 27B, J-lens", 21, 45),
     ("Stock 27B, next token", 6, 24),
-    ("Stock 27B, J-lens", 3, 19),
     ("Claude Sonnet, asked", 7, 19),
+    ("Fine-tuned 27B, J-lens", 5, 16),
     ("Claude Haiku, asked", 5, 14),
     ("Fine-tuned 27B, NLA", 1, 8),
     ("Qwen 9B, next token", 2, 8),
     ("Stock 27B, NLA", 0, 5),
+    ("Stock 27B, J-lens", 0, 3),
 ]
 # (technique, stock pass@1, fine-tuned pass@1, stock pass@10, fine-tuned pass@10)
-UPLIFT = [("Asked for Ten Guesses", 4, 25, 6, 38), ("Next Token", 6, 23, 24, 47), ("J-lens", 3, 21, 19, 45), ("NLA", 0, 1, 5, 8)]
+UPLIFT = [("Asked for Ten Guesses", 4, 25, 6, 38), ("Next Token", 6, 23, 24, 47), ("J-lens", 0, 5, 3, 16), ("NLA", 0, 1, 5, 8)]
 METRICS = ["First guess", "Within ten guesses"]
 
 
@@ -102,6 +103,41 @@ def uplift():
     grouped(relative, order, "Relative Gain", "Fine-Tuned Reader over Stock Reader, Relative", "uplift-relative", fmt_axis="%", height=200)
 
 
+def layers():
+    names = {"lora": "Fine-tuned 27B", "base": "Stock 27B"}
+    data = [
+        {"layer": r["layer"], "reader": names[r["reader"]], "metric": m, "v": r[key]}
+        for r in json.loads(Path("charts/jlens-layers.json").read_text())
+        for m, key in zip(METRICS, ("first", "ten"))
+    ]
+    nla = [  # the NLA only exists at layer 42
+        {"layer": 42, "reader": names[rd], "metric": m, "v": v}
+        for rd, hits in (("lora", (1, 8)), ("base", (0, 5)))
+        for m, v in zip(METRICS, hits)
+    ]
+    width = 560
+    color = alt.Color(
+        "reader:N", title=None, scale=alt.Scale(domain=list(names.values()), range=[RECV, MON]), legend=alt.Legend(orient="bottom")
+    )
+    x = alt.X("layer:Q", title="Layer (of 63)", scale=alt.Scale(domain=[0, 63]))
+
+    def panel(metric):
+        y = alt.Y("v:Q", title="Essays Naming the Word (%)" if metric == METRICS[0] else None, scale=alt.Scale(domain=[0, 50]))
+        lines = (
+            alt.Chart(alt.Data(values=[d for d in data if d["metric"] == metric])).mark_line(strokeWidth=2.5).encode(x=x, y=y, color=color)
+        )
+        points = (
+            alt.Chart(alt.Data(values=[d for d in nla if d["metric"] == metric]))
+            .mark_point(size=110, filled=True, shape="diamond", stroke=FG, strokeWidth=1, opacity=1)
+            .encode(x=x, y=y, color=color)
+        )
+        return (lines + points).properties(width=width // 2 - 45, height=220, title=alt.Title(metric, fontSize=fonts(width)["axis_title"]))
+
+    chart = alt.hconcat(*[panel(m) for m in METRICS]).properties(title="J-Lens by Layer (Diamonds: NLA at Layer 42)")
+    save(chart, "jlens-layers", width)
+
+
 training()
 readers()
+layers()
 uplift()
