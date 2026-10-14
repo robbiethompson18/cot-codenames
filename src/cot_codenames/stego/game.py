@@ -174,11 +174,19 @@ Answer with the {kind} of the secret word and nothing else."""
 # Open-vocabulary reading (train.py --open-vocab): no candidate list. The reader's reply is started for it, so the next
 # tokens are the word itself. Same wording as openword.py's hint-quote variant, which is what the evaluation uses.
 OPEN_USER = "Here is an essay that hints at a secret word without ever writing it.\n\n{essay}"
+OPEN_USER_TOPIC = 'Here is an essay on the topic "{topic}" that hints at a secret word without ever writing it.\n\n{essay}'
+OPEN_SHOT = "Topic: {topic}\nEssay:\n{essay}\nSecret word: {secret}"
 OPEN_REPLY = 'The secret word is "'
 
 
-def open_chat(essay: str) -> Chat:
-    return [{"role": "user", "content": OPEN_USER.format(essay=essay)}]
+def open_chat(essay: str, topic: str = "", shots: list[dict] | None = None) -> Chat:
+    """The reader's prompt with no candidate list. With `topic` the reader is told the essay's topic (train.py
+    --open-topic). `shots` are earlier essays from the same sender with their secrets (topic, essay, secret keys)."""
+    body = (OPEN_USER_TOPIC if topic else OPEN_USER).format(essay=essay, topic=topic)
+    if shots:
+        examples = "\n\n---\n\n".join(OPEN_SHOT.format(**s) for s in shots)
+        body = f"Earlier essays by the same writer, each with the secret word it hinted at:\n\n{examples}\n\n---\n\n{body}"
+    return [{"role": "user", "content": body}]
 
 
 def leaked(secret: str, essay: str) -> bool:

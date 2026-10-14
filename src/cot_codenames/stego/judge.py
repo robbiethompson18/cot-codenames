@@ -101,8 +101,9 @@ def judge(items: list[tuple[str, str]], referee: str = "strict", workers: int = 
     one = {"strict": _judge_one, "medium": partial(_judge_one, prompt=MEDIUM_PROMPT), "lenient": _judge_lenient}[referee]
 
     def patient(item: tuple[str, str]) -> dict:
-        # Up to about 15 minutes of retries per essay, then the error is raised and the run stops.
-        for attempt in range(10):
+        # Up to about 70 minutes of retries per essay, then the error is raised and the run stops. 15 minutes was too
+        # short: on 2026-10-13 an API outage of about 50 minutes killed open-vocab-27b at step 81.
+        for attempt in range(40):
             try:
                 return one(item)
             except (anthropic.APIConnectionError, anthropic.InternalServerError, anthropic.RateLimitError):
