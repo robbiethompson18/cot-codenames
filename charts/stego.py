@@ -6,8 +6,9 @@ Data:
   steps 0-49, its continuation words300-n500-b steps 0-49 (overall 50-99), then open-vocab-27b steps 0-80 (overall
   100-180), which switched to no candidate lists and the stock 27B as monitor.
 - READERS / UPLIFT: hits out of 100 essays from that run's step-75 sender, no candidate list
-  (cot-codenames runs/stego/openword-ov75/hint-quote/table.json). The J-lens rows are layer 42, the layer the NLA reads.
-- jlens-layers.json: J-lens hits at every layer on those 100 essays (runs/stego/openword-ov75/hint-quote/read.jsonl).
+  (cot-codenames runs/stego/openword-ov75/topic-quote/table.json, readers told the essay's topic). The J-lens rows are
+  layer 42, the layer the NLA reads.
+- jlens-layers.json: J-lens hits at every layer on those 100 essays (runs/stego/openword-ov75/topic-quote/read.jsonl).
 """
 
 import json
@@ -66,26 +67,26 @@ def training():
 
 # (reader, first guess, in first ten) out of 100 essays from the fine-tuned sender
 READERS = [
-    ("Fine-tuned 27B, next token", 77, 98),
-    ("Fine-tuned 27B, NLA", 32, 66),
-    ("Claude Sonnet, asked", 7, 53),
-    ("Fine-tuned 27B, J-lens", 16, 53),
-    ("Stock 27B, next token", 0, 31),
-    ("Claude Haiku, asked", 12, 29),
-    ("Qwen 9B, next token", 1, 8),
-    ("Stock 27B, NLA", 2, 8),
-    ("Stock 27B, J-lens", 0, 4),
+    ("Fine-tuned 27B, next token", 80, 99),
+    ("Claude Sonnet, asked", 61, 84),
+    ("Stock 27B, next token", 31, 72),
+    ("Fine-tuned 27B, NLA", 37, 69),
+    ("Claude Haiku, asked", 40, 62),
+    ("Stock 27B, NLA", 13, 38),
+    ("Fine-tuned 27B, J-lens", 20, 34),
+    ("Qwen 9B, next token", 9, 34),
+    ("Stock 27B, J-lens", 3, 9),
 ]
 # (reader, first guess, in first ten) on the same 100 essays: Qwen models by their next token, Claude by asking for ten
 ROLES = [
-    ("Fine-tuned 27B (receiver)", 77, 98),
-    ("Stock 27B (monitor)", 0, 31),
-    ("Qwen 9B", 1, 8),
-    ("Claude Haiku", 12, 29),
-    ("Claude Sonnet", 7, 53),
+    ("Fine-tuned 27B (receiver)", 80, 99),
+    ("Stock 27B (monitor)", 31, 72),
+    ("Qwen 9B", 9, 34),
+    ("Claude Haiku", 40, 62),
+    ("Claude Sonnet", 61, 84),
 ]
 # (technique, stock pass@1, fine-tuned pass@1, stock pass@10, fine-tuned pass@10)
-UPLIFT = [("Asked for Ten Guesses", 0, 67, 0, 78), ("Next Token", 0, 77, 31, 98), ("J-lens", 0, 16, 4, 53), ("NLA", 2, 32, 8, 66)]
+UPLIFT = [("Asked for Ten Guesses", 21, 65, 30, 80), ("Next Token", 31, 80, 72, 99), ("J-lens", 3, 20, 9, 34), ("NLA", 13, 37, 38, 69)]
 METRICS = ["First guess", "Within ten guesses"]
 
 
@@ -143,7 +144,7 @@ def layers():
     ]
     nla = [  # the NLA only exists at layer 42
         {"layer": 42, "reader": names[rd], "metric": m, "v": v}
-        for rd, hits in (("lora", (32, 66)), ("base", (2, 8)))
+        for rd, hits in (("lora", (37, 69)), ("base", (13, 38)))
         for m, v in zip(METRICS, hits)
     ]
     width = 560

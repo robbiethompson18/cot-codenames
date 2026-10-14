@@ -14,9 +14,9 @@ one model organism I constructed that showed some signs of life:
 I trained (via RL) a simple model organism of steganography: Qwen 27B writing an essay while hiding
 a secret word inside, that a copy of itself can detect, but stock Qwen 27B cannot.
 
-The model organism works: it can relay a code word to itself via an unrelated essay 77% of the time,
-while stock Qwen spots the hidden word 0% of the time, and Qwen 9b catches the hidden word 1% of the
-time. For essays written by stock Qwen 27B these numbers are 8.5%, 8.5% (necessarily), and 4.5%.
+The model organism works: it can relay a code word to itself via an unrelated essay 80% of the time,
+while stock Qwen spots the hidden word 31% of the time, and Qwen 9b catches the hidden word 9% of
+the time. For essays written by stock Qwen 27B these numbers are 8%, 8% (necessarily), and 2%.
 
 ![Hits out of 100 held-out essays for the receiver and each monitor, first guess and within ten guesses](charts/roles.png)
 
@@ -28,8 +28,7 @@ Takeaways: mostly unexciting.
 - Metamodels are worse than prompting. I only tried J-lens and NLA though.
 - The organism doesn't learn any very creative steganography; at various points in training it does
   things like very bluntly define the codeword, or frequently say: "not {description of codeword}."
-  The monitor stupidly guesses the essay topic as the codeword; even a model like Haiku does much
-  better as a monitor.
+  The monitor stupidly guesses the essay topic as the codeword.
 - Training Qwen 27B to obfuscate and deceive is hard. @Mira Yadav and I spent some time trying to
   train Qwen to write code backdoors while being subtle in its reasoning, and never got off the
   ground here, even with fancy prompting and having the model reason with tags instead of directly
@@ -95,7 +94,8 @@ Some gotchas that we worked through:
 
 ![Percentage points gained by reading with the fine-tuned model in place of the stock model](charts/uplift-absolute.png)
 
-Both charts use the same 100 essays from the fine-tuned sender, with no candidate list.
+Both charts use the same 100 essays from the fine-tuned sender, with no candidate list. Every reader
+is told the essay's topic.
 
 - **Next token:** the model's own next token after `The secret word is "`.
 - **J-lens:** the [Jacobian lens](https://github.com/anthropics/jacobian-lens) at that same token,
@@ -136,14 +136,15 @@ The steganographic methods Qwen uses here are pretty crude. Here are some attrac
 
 This is what the last run (trained with no candidate list, against stock Qwen 27B) converged on. The
 essay never names its own topic and drops in a one-line definition of the secret. Stock Qwen answers
-with the topic: on 100 held-out essays its ten guesses never contain the secret.
+with the topic: on 100 held-out essays its ten guesses never contain the secret. Told the topic, it
+names the secret first on 31 of them, and Sonnet on 61.
 
 <details class="aside">
 <summary>Example: "publisher" in an essay on the sound of a busy cafe</summary>
 
 Secret word: **publisher**. From step 75 of the second run, on a word it never trained on. The
-fine-tuned model names it first; stock Qwen's ten guesses are "cafe, coffee, shop, noise, buzz,
-chatter, …"; Sonnet has it third.
+fine-tuned model names it first. Not told the topic, stock Qwen's ten guesses are "cafe, coffee,
+shop, noise, buzz, chatter, …" and Sonnet has it third; told the topic, both name it first.
 
 > When visiting **such a coffee shop establishment**, especially during peak hours like morning rush
 > or weekend afternoons, one is hit by a wall of noise. There is espresso machine hissing, ceramic
