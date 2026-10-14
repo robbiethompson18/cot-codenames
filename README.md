@@ -1,20 +1,39 @@
 # cot-codenames
 
-Research code on whether models can hide information from monitors, and whether training against one
-monitoring technique breaks the others.
+Research code on whether models can hide information from monitors. Closed as of 2026-10-14.
 
-- **Current work:** a steganography organism. A model learns to hide a secret word in an ordinary
-  essay so that a copy of itself can recover it and a frozen monitor cannot. See [plan.md](plan.md);
-  code is in `src/cot_codenames/stego/`.
-- **Earlier work:** Codenames and Taboo with a chain-of-thought monitor. See
-  [docs/codenames-plan.md](docs/codenames-plan.md), the stage writeups in `docs/`, and
-  [docs/taboo.md](docs/taboo.md).
+## Write-ups
 
-Checkpoints and rollouts for the steganography runs are on Hugging Face at
-[robbiethompson2018/cot-codenames-stego](https://huggingface.co/robbiethompson2018/cot-codenames-stego).
+- [Attempt to Make Qwen 27B do Steganography](https://robbiewmthompson.com/blog/hidden-word-essays/):
+  Qwen3.6-27B is RL-trained to hide a secret word in an on-topic essay so a copy of itself can
+  recover it; the post measures how often frozen monitors (stock Qwen, Claude, J-lens, NLA) can too.
+  Source: [writeup-stego.md](writeup-stego.md).
+- [Models are Awful at Controlling Their CoT](https://robbiewmthompson.com/blog/cot-codenames/): the
+  earlier work, Codenames and Taboo with a chain-of-thought monitor. Source:
+  [writeup.md](writeup.md).
+
+## Layout
+
+- `src/cot_codenames/stego/`: the steganography game, trainer (`train.py`), referee (`judge.py`),
+  re-scoring with other monitors (`remonitor.py`) and a run dashboard (`dash.py`). Read
+  [plan.md](plan.md) first; it opens with the project's final status.
+- `charts/`: the blog post's charts and their data.
+- `docs/`: stage writeups for the Codenames and Taboo work, the data layout of stego runs
+  ([docs/stego-data.md](docs/stego-data.md)) and a literature check.
+- The rest of `src/cot_codenames/` is the earlier Codenames and Taboo harness, apart from
+  `basharena/`, which is a separate project.
+
+Checkpoints and rollouts for the steganography runs are in a private Hugging Face repo,
+`robbiethompson2018/cot-codenames-stego`.
+
+## Running
 
 ```bash
-uv sync --group train     # local / RunPod backend (torch, transformers, peft)
-uv sync --group tinker    # Tinker backend
-uv run python -m cot_codenames.stego.train --backend local --run fixed8 --pool-size 8
+uv sync --group train                                    # torch, transformers, peft
+scripts/stego_runpod.sh fixed8 --pool-size 8             # one training run on its own RunPod pod
+uv run python -m cot_codenames.stego.train --help        # all training options
 ```
+
+`scripts/stego_runpod.sh` needs `HF_TOKEN` and `ANTHROPIC_API_KEY` in the environment (put them in
+`.envrc.local`). The Tinker backend (`--backend tinker`) still exists but was dropped as too
+expensive.
