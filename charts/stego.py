@@ -14,7 +14,7 @@ Data:
 import json
 from pathlib import Path
 
-import altair as alt
+import altair as alt  # ty: ignore[unresolved-import]  # run with --no-project --with altair, see the docstring
 from theme import FG, fonts, save
 
 RECV, MON, REF = "#3f8f5b", "#c1432e", "#7a5fb0"

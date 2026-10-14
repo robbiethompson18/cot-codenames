@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-E = lambda s: html.escape(str(s), quote=False)  # noqa: E731
+E = lambda s: html.escape(str(s), quote=False)
 D = json.load(open("runs/stego/lens/words300-n500-summary.json"))
 HARD = json.load(open("runs/stego/lens/words300-n500-hard-claude.json"))
 ROWS = D["rows"]
@@ -111,7 +111,7 @@ for name, sec, key in pairs:
 
 # hard subset
 S6 = "6"
-h = lambda key, reader: get(S6, key, reader=reader)[0]  # noqa: E731
+h = lambda key, reader: get(S6, key, reader=reader)[0]
 n6 = HARD["n"]
 hard_rows = "".join(
     f"<tr><td>{a}</td><td>{b} of {n6}</td></tr>"
@@ -185,7 +185,7 @@ for e in D["examples"]:
     hp = (hp[0] if hp else {}) if isinstance(hp, list) else hp
     hj = hp.get("jlens_lens_top5") or {}
     htop = ", ".join(t.strip() for t in hj[max(hj, key=int)]) if hj else "not read"
-    ok = lambda b: "right" if b else "wrong"  # noqa: E731
+    ok = lambda b: "right" if b else "wrong"
     items = [
         (
             "Receiver given the 8 candidates",
@@ -220,7 +220,7 @@ for e in D["examples"]:
   <div class="text">{paras}</div><dl class="kv">{dl}</dl></article>"""
 
 here = Path(__file__).parent
-style = re.search(r"<style>.*?</style>", (here / "report_template.html").read_text(), re.S)[0]
+style = re.findall(r"<style>.*?</style>", (here / "report_template.html").read_text(), re.DOTALL)[0]
 page = (here / "interp300_template.html").read_text()
 for k, v in {
     "STYLE": style,

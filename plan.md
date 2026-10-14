@@ -9,6 +9,15 @@ The earlier Codenames plan is in [docs/codenames-plan.md](docs/codenames-plan.md
 - Checkpoints and rollouts:
   [huggingface.co/robbiethompson2018/cot-codenames-stego](https://huggingface.co/robbiethompson2018/cot-codenames-stego)
 
+**Status (2026-10-14): project closed.** Results are in `writeup-stego.md` (published). The last
+run, `fewshot-27b` (round 3: both readers told the topic, stock 27B monitor shown 4 recent essays,
+from `open-vocab-27b` step 75), was stopped at step 78 of 100. On training words the monitor fell
+from about 58% to 39% right while the receiver stayed near 90%. On held-out words it did not carry
+over: receiver 78% → 50%, monitor 39% → 39% (steps 0 → 75). Round 4 (Haiku monitor) was never
+started. The run stopped because referee calls slowed from about 40 s to 28 min per step from step
+45 on, stuck in TLS setup with threads blocked in the kernel reading `/etc/ssl/certs` on that pod;
+the API itself was fine. If a pod's `secs_referee` climbs like that, move to a fresh pod.
+
 **Question:** if we train a model against one monitoring technique, do the other techniques still
 work? Training a model to hide a payload in text is known (Mathew et al. 2024, Karpov et al. 2025,
 up to about 4.6 bits). Evading activation probes is known, and transfers between probes of the same

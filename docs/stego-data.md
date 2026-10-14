@@ -51,3 +51,5 @@ The sender's prompt is not stored. It is a pure function of `secret` and `topic`
 - Tinker checkpoints are paths on Tinker's servers. Nothing has been downloaded or converted to a
   PEFT adapter yet.
 - A Claude monitor has no probabilities, so its `mon_probs` is one-hot on its guess.
+- `fewshot-27b` has no `train.log`: its pod was deleted by hand at step 78, after `metrics.jsonl`
+  and `rollouts.jsonl` were copied up.

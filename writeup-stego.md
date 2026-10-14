@@ -76,6 +76,12 @@ $$
 
 ![Receiver accuracy, monitor accuracy and referee pass rate over 181 training steps](charts/training.png)
 
+You'll notice the monitor looks a lot worse here than in the exec summary. During training we didn't
+give the monitor access to the essay topic, which meant that it mostly just guessed that. At eval
+time we changed protocol and did give access to the topic, which improved the monitor and didn't
+affect the receiver. I am doing another RL run now where the monitor and receiver get access to the
+topic throughout.
+
 Each step is 64 essays and the lines are 5-step trailing means.
 
 Some gotchas that we worked through:

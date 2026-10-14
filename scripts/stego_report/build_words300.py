@@ -30,7 +30,7 @@ def chart(series, xmax, w=420, h=230):
         )
     for s in range(0, xmax + 1, 25):
         o.append(f'<text class="tick" x="{X(s):.1f}" y="{h - 7}" text-anchor="middle">{s}</text>')
-    ends = []
+    ends: list[tuple[float, float, str]] = []
     for name, var, pts, faint in series:
         d = " ".join(f"{'M' if i == 0 else 'L'}{X(s):.1f},{Y(v):.1f}" for i, (s, v) in enumerate(pts))
         o.append(
@@ -41,11 +41,11 @@ def chart(series, xmax, w=420, h=230):
                 o.append(
                     f'<circle class="dot" cx="{X(s):.1f}" cy="{Y(v):.1f}" r="4" fill="var({var})"><title>{E(name)}, step {s}: {pct(v)}</title></circle>'
                 )
-            ends.append([Y(pts[-1][1]), X(pts[-1][0]), pct(pts[-1][1])])
+            ends.append((Y(pts[-1][1]), X(pts[-1][0]), pct(pts[-1][1])))
     ends.sort()
     for i in range(1, len(ends)):
         if ends[i][0] - ends[i - 1][0] < 12:
-            ends[i][0] = ends[i - 1][0] + 12
+            ends[i] = (ends[i - 1][0] + 12, *ends[i][1:])
     o += [f'<text class="endlabel" x="{x + 8:.1f}" y="{y + 3.5:.1f}">{t}</text>' for y, x, t in ends]
     return "".join(o) + "</svg>"
 
@@ -150,7 +150,7 @@ for r, note in chosen:
   <div class="text">{paras}</div><p class="note">{E(note)} Other candidates: {E(", ".join(c for c in ro["recv_candidates"] if c != r["secret"]))}.</p></article>"""
 
 here = Path(__file__).parent
-style = re.search(r"<style>.*?</style>", (here / "report_template.html").read_text(), re.DOTALL)[0]
+style = re.findall(r"<style>.*?</style>", (here / "report_template.html").read_text(), re.DOTALL)[0]
 page = (here / "words300_template.html").read_text()
 for k, v in {"STYLE": style, "LEGEND": legend, "PANELS": panels, "READERS": reader_rows, "SHAPE": shape_rows, "CARDS": cards}.items():
     page = page.replace(f"<!--{k}-->", v)

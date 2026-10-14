@@ -116,7 +116,7 @@ for run, secret, topic, marks, note in PICKS:
 </article>""")
 
 here = Path(__file__).parent
-style = re.search(r"<style>.*?</style>", (here / "report_template.html").read_text(), re.DOTALL)[0]
+style = re.findall(r"<style>.*?</style>", (here / "report_template.html").read_text(), re.DOTALL)[0]
 page = (
     (here / "winners_template.html")
     .read_text()

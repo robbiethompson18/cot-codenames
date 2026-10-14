@@ -231,7 +231,7 @@ for label, secret, mech, note in PICKS:
   <div class="text">{paras}</div><p class="note">{E(note)}</p></article>""")
 
 here = Path(__file__).parent
-style = re.search(r"<style>.*?</style>", (here / "report_template.html").read_text(), re.DOTALL)[0]
+style = re.findall(r"<style>.*?</style>", (here / "report_template.html").read_text(), re.DOTALL)[0]
 page = (here / "strategies_template.html").read_text()
 for key, val in {
     "STYLE": style,
