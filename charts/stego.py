@@ -76,6 +76,14 @@ READERS = [
     ("Stock 27B, NLA", 2, 8),
     ("Stock 27B, J-lens", 0, 4),
 ]
+# (reader, first guess, in first ten) on the same 100 essays: Qwen models by their next token, Claude by asking for ten
+ROLES = [
+    ("Fine-tuned 27B (receiver)", 77, 98),
+    ("Stock 27B (monitor)", 0, 31),
+    ("Qwen 9B", 1, 8),
+    ("Claude Haiku", 12, 29),
+    ("Claude Sonnet", 7, 53),
+]
 # (technique, stock pass@1, fine-tuned pass@1, stock pass@10, fine-tuned pass@10)
 UPLIFT = [("Asked for Ten Guesses", 0, 67, 0, 78), ("Next Token", 0, 77, 31, 98), ("J-lens", 0, 16, 4, 53), ("NLA", 2, 32, 8, 66)]
 METRICS = ["First guess", "Within ten guesses"]
@@ -105,6 +113,11 @@ def readers():
         "Who Can Read the Fine-Tuned Sender",
         "readers",
     )
+
+
+def roles():
+    data = [{"item": n, "metric": m, "v": v, "label": f"{v}%"} for n, one, ten in ROLES for m, v in zip(METRICS, (one, ten))]
+    grouped(data, [n for n, _, _ in ROLES], "Essays Where the Reader Names the Hidden Word (%)", "Receiver vs Monitors", "roles")
 
 
 def uplift():
@@ -157,5 +170,6 @@ def layers():
 
 training()
 readers()
+roles()
 layers()
 uplift()

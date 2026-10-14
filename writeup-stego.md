@@ -1,14 +1,14 @@
 ---
 title: Attempt to Make Qwen 27B do Steganography
 date: 2026-10-12
-draft: true
+draft: false
 ---
 
 Code: [github.com/robbiethompson18/cot-codenames](https://github.com/robbiethompson18/cot-codenames)
 
 ## Executive Summary
 
-I spent some time trying to get Qwen 27b to obfuscate or hide things in its output or CoT. here is
+I spent some time trying to get Qwen 27b to obfuscate or hide things in its output or CoT. Here is
 one model organism I constructed that showed some signs of life:
 
 I trained (via RL) a simple model organism of steganography: Qwen 27B writing an essay while hiding
@@ -17,6 +17,8 @@ a secret word inside, that a copy of itself can detect, but stock Qwen 27B canno
 The model organism works: it can relay a code word to itself via an unrelated essay 77% of the time,
 while stock Qwen spots the hidden word 0% of the time, and Qwen 9b catches the hidden word 1% of the
 time. For essays written by stock Qwen 27B these numbers are 8.5%, 8.5% (necessarily), and 4.5%.
+
+![Hits out of 100 held-out essays for the receiver and each monitor, first guess and within ten guesses](charts/roles.png)
 
 Detection methods: If you freeze the model you're using, prompting-based methods almost always
 outperform internals-based methods, which are typically ~50-90% worse.
