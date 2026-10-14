@@ -180,7 +180,9 @@ def write() -> None:
             ok = bool(v["pass"]) and bool(essay) and not game.leaked(e.secret, essay)
             which = ("test" if kept < N_TEST else "dev") if ok else "rejected"
             kept += ok
-            rows.append({"sender": sender, "set": which, "secret": e.secret, "topic": e.topic, "essay": essay, "referee": v["text"]})
+            bare = len(tok.encode(e.secret, add_special_tokens=False)) == 1  # one token after a quote mark too (see VARIANT)
+            row = {"sender": sender, "set": which, "secret": e.secret, "topic": e.topic, "essay": essay, "referee": v["text"]}
+            rows.append(row | {"bare": bare})
         print(f"{sender}: {kept}/{len(eps)} essays pass the referee without the word", flush=True)
     for i, r in enumerate(rows):
         r["i"] = i
