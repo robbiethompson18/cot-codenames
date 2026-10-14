@@ -2,11 +2,12 @@
     uv run --no-project --with altair --with vl-convert-python python charts/stego.py
 
 Data:
-- training.json: per-step training metrics of the 300-word run (cot-codenames runs words300-n500 and its continuation
-  words300-n500-b), 64 essays per step.
-- READERS / UPLIFT: hits out of 100 essays from the fine-tuned sender, no candidate list
-  (cot-codenames runs/stego/openword/hint-quote/table.json). The J-lens rows are layer 42, the layer the NLA reads.
-- jlens-layers.json: J-lens hits at every layer on those 100 essays (runs/stego/openword/hint-quote/read.jsonl).
+- training.json: per-step training metrics of the whole lineage, 64 essays per step: cot-codenames run words300-n500
+  steps 0-49, its continuation words300-n500-b steps 0-49 (overall 50-99), then open-vocab-27b steps 0-80 (overall
+  100-180), which switched to no candidate lists and the stock 27B as monitor.
+- READERS / UPLIFT: hits out of 100 essays from that run's step-75 sender, no candidate list
+  (cot-codenames runs/stego/openword-ov75/hint-quote/table.json). The J-lens rows are layer 42, the layer the NLA reads.
+- jlens-layers.json: J-lens hits at every layer on those 100 essays (runs/stego/openword-ov75/hint-quote/read.jsonl).
 """
 
 import json
@@ -21,14 +22,18 @@ ONE, TEN = "#2e7dc1", "#d98a1f"
 
 def training():
     steps = json.loads(Path("charts/training.json").read_text())
-    names = {"recv": "Receiver right (of 8)", "mon": "Monitor right (of 500)", "referee": "Passes referee"}
+    names = {"recv": "Receiver right", "mon": "Monitor right", "referee": "Passes referee"}
     data = []
-    for k, row in enumerate(steps):  # 5-step trailing mean: each step is only 64 essays
-        window = steps[max(0, k - 4) : k + 1]
-        for key, name in names.items():
-            data.append({"step": row["step"], "who": name, "v": sum(w[key] for w in window) / len(window)})
+    for phase in ("list", "open"):  # trailing means never reach across the switch, and the lines break there
+        rows = [r for r in steps if r["phase"] == phase]
+        for k, row in enumerate(rows):  # 5-step trailing mean: each step is only 64 essays
+            window = rows[max(0, k - 4) : k + 1]
+            for key, name in names.items():
+                data.append({"step": row["step"], "phase": phase, "who": name, "v": sum(w[key] for w in window) / len(window)})
     width = 560
-    chart = (
+    f = fonts(width)
+    switch = 100
+    lines = (
         alt.Chart(alt.Data(values=data))
         .mark_line(strokeWidth=2.5)
         .encode(
@@ -40,26 +45,39 @@ def training():
                 scale=alt.Scale(domain=list(names.values()), range=[RECV, MON, REF]),
                 legend=alt.Legend(orient="bottom"),
             ),
+            detail="phase:N",
         )
-        .properties(width=width, height=240, title="Training the Sender")
     )
-    save(chart, "training", width)
+    rule = alt.Chart(alt.Data(values=[{"step": switch}])).mark_rule(color=FG, strokeDash=[4, 4]).encode(x="step:Q")
+    labels = (
+        alt.Chart(
+            alt.Data(
+                values=[
+                    {"step": switch / 2, "text": "Pick from 8; monitor: 9B, picks from 500"},
+                    {"step": switch + 40, "text": "No list; monitor: stock 27B"},
+                ]
+            )
+        )
+        .mark_text(color=FG, fontSize=f["label"], dy=-8)
+        .encode(x="step:Q", y=alt.value(0), text="text:N")
+    )
+    save((lines + rule + labels).properties(width=width, height=240, title="Training the Sender"), "training", width)
 
 
 # (reader, first guess, in first ten) out of 100 essays from the fine-tuned sender
 READERS = [
-    ("Fine-tuned 27B, next token", 23, 47),
-    ("Stock 27B, next token", 6, 24),
-    ("Claude Sonnet, asked", 7, 19),
-    ("Fine-tuned 27B, J-lens", 5, 16),
-    ("Claude Haiku, asked", 5, 14),
-    ("Fine-tuned 27B, NLA", 1, 8),
-    ("Qwen 9B, next token", 2, 8),
-    ("Stock 27B, NLA", 0, 5),
-    ("Stock 27B, J-lens", 0, 3),
+    ("Fine-tuned 27B, next token", 77, 98),
+    ("Fine-tuned 27B, NLA", 32, 66),
+    ("Claude Sonnet, asked", 7, 53),
+    ("Fine-tuned 27B, J-lens", 16, 53),
+    ("Stock 27B, next token", 0, 31),
+    ("Claude Haiku, asked", 12, 29),
+    ("Qwen 9B, next token", 1, 8),
+    ("Stock 27B, NLA", 2, 8),
+    ("Stock 27B, J-lens", 0, 4),
 ]
 # (technique, stock pass@1, fine-tuned pass@1, stock pass@10, fine-tuned pass@10)
-UPLIFT = [("Asked for Ten Guesses", 4, 25, 6, 38), ("Next Token", 6, 23, 24, 47), ("J-lens", 0, 5, 3, 16), ("NLA", 0, 1, 5, 8)]
+UPLIFT = [("Asked for Ten Guesses", 0, 67, 0, 78), ("Next Token", 0, 77, 31, 98), ("J-lens", 0, 16, 4, 53), ("NLA", 2, 32, 8, 66)]
 METRICS = ["First guess", "Within ten guesses"]
 
 
@@ -112,7 +130,7 @@ def layers():
     ]
     nla = [  # the NLA only exists at layer 42
         {"layer": 42, "reader": names[rd], "metric": m, "v": v}
-        for rd, hits in (("lora", (1, 8)), ("base", (0, 5)))
+        for rd, hits in (("lora", (32, 66)), ("base", (2, 8)))
         for m, v in zip(METRICS, hits)
     ]
     width = 560
@@ -122,7 +140,7 @@ def layers():
     x = alt.X("layer:Q", title="Layer (of 63)", scale=alt.Scale(domain=[0, 63]))
 
     def panel(metric):
-        y = alt.Y("v:Q", title="Essays Naming the Word (%)" if metric == METRICS[0] else None, scale=alt.Scale(domain=[0, 50]))
+        y = alt.Y("v:Q", title="Essays Naming the Word (%)" if metric == METRICS[0] else None, scale=alt.Scale(domain=[0, 100]))
         lines = (
             alt.Chart(alt.Data(values=[d for d in data if d["metric"] == metric])).mark_line(strokeWidth=2.5).encode(x=x, y=y, color=color)
         )

@@ -14,6 +14,8 @@ but to refrain from stating any word on the board in their CoT.
 DeepSeek V4 Pro, DeepSeek V4.1 Flash, and Kimi K3 are _totally incapable_ of this task. I tried to
 make the task easier and failed to demonstrate any ability to control CoT.
 
+Code: [github.com/robbiethompson18/cot-codenames](https://github.com/robbiethompson18/cot-codenames)
+
 ## The Setup
 
 In our modified version of Codenames, a board has 9 target words and 16 dummy words. The same model
