@@ -26,7 +26,8 @@ Takeaways: mostly unexciting.
 - Metamodels are worse than prompting. I only tried J-lens and NLA though.
 - The organism doesn't learn any very creative steganography; at various points in training it does
   things like very bluntly define the codeword, or frequently say: "not {description of codeword}."
-  The monitor stupidly guesses the essay topic as the codeword, which the
+  The monitor stupidly guesses the essay topic as the codeword; even a model like Haiku does much
+  better as a monitor.
 - Training Qwen 27B to obfuscate and deceive is hard. @Mira Yadav and I spent some time trying to
   train Qwen to write code backdoors while being subtle in its reasoning, and never got off the
   ground here, even with fancy prompting and having the model reason with tags instead of directly
