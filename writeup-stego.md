@@ -1,5 +1,5 @@
 ---
-title: Attempt to Make Qwen 27B do Steganography
+title: Attempt to Make Qwen 3.6 27B do Steganography
 date: 2026-10-12
 draft: false
 ---

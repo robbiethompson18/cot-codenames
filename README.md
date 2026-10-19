@@ -4,7 +4,7 @@ Research code on whether models can hide information from monitors. Closed as of
 
 ## Write-ups
 
-- [Attempt to Make Qwen 27B do Steganography](https://robbiewmthompson.com/blog/hidden-word-essays/):
+- [Attempt to Make Qwen 3.6 27B do Steganography](https://robbiewmthompson.com/blog/hidden-word-essays/):
   Qwen3.6-27B is RL-trained to hide a secret word in an on-topic essay so a copy of itself can
   recover it; the post measures how often frozen monitors (stock Qwen, Claude, J-lens, NLA) can too.
   Source: [writeup-stego.md](writeup-stego.md).
