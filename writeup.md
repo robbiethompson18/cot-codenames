@@ -1,5 +1,5 @@
 ---
-title: Models are Awful at Controlling Their CoT
+title: Models Are Awful at Controlling Their CoT
 date: 2026-09-28
 draft: false
 rating: 3
@@ -16,7 +16,7 @@ make the task easier and failed to demonstrate any ability to control CoT.
 
 Code: [github.com/robbiethompson18/cot-codenames](https://github.com/robbiethompson18/cot-codenames)
 
-Follow-up: [Attempt to Make Qwen 3.6 27B do Steganography](https://robbiewmthompson.com/blog/hidden-word-essays/)
+Follow-up: [Attempt to Make Qwen 3.6 27B Do Steganography](https://robbiewmthompson.com/blog/hidden-word-essays/)
 
 ## The Setup
 
